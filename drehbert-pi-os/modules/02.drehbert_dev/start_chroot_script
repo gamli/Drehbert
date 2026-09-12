@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+# Do not expose WiFi credentials through CustomPiOS' xtrace build log.
+set +x
+set -Eeuo pipefail
+
+: "${DREHBERT_DEV_WIFI_SSID:?DREHBERT_DEV_WIFI_SSID is missing}"
+: "${DREHBERT_DEV_WIFI_PASSWORD:?DREHBERT_DEV_WIFI_PASSWORD is missing}"
+: "${DREHBERT_DEV_WIFI_COUNTRY:?DREHBERT_DEV_WIFI_COUNTRY is missing}"
+: "${UV_VERSION:?UV_VERSION is missing}"
+: "${UV_DOWNLOAD_URL:?UV_DOWNLOAD_URL is missing}"
+: "${UV_SHA256:?UV_SHA256 is missing}"
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get install --yes --no-install-recommends \
+  avahi-daemon \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  network-manager \
+  openssh-server \
+  pkg-config \
+  python3-dev \
+  rsync \
+  sudo
+
+uv_archive="$(mktemp)"
+uv_directory="$(mktemp --directory)"
+trap 'rm -f "${uv_archive}"; rm -rf "${uv_directory}"' EXIT
+
+curl --fail --location --show-error --silent --retry 3 \
+  --output "${uv_archive}" "${UV_DOWNLOAD_URL}"
+printf '%s  %s\n' "${UV_SHA256}" "${uv_archive}" |
+  sha256sum --check --status
+tar --extract --gzip --file "${uv_archive}" --directory "${uv_directory}"
+install --owner root --group root --mode 0755 \
+  "${uv_directory}/uv-arm-unknown-linux-musleabihf/uv" \
+  "${uv_directory}/uv-arm-unknown-linux-musleabihf/uvx" \
+  /usr/local/bin/
+
+installed_uv_version="$(uv --version)"
+[[ "${installed_uv_version}" == "uv ${UV_VERSION} "* ]] || {
+  echo "Expected uv ${UV_VERSION}, found ${installed_uv_version}." >&2
+  exit 1
+}
+
+rm -f "${uv_archive}"
+rm -rf "${uv_directory}"
+trap - EXIT
+
+for group in sudo adm dialout gpio bluetooth; do
+  if getent group "${group}" >/dev/null; then
+    usermod --append --groups "${group}" drehbert
+  fi
+done
+usermod --shell /bin/bash drehbert
+printf '%s:%s\n' drehbert drehbert | chpasswd
+
+printf '%s\n' 'drehbert ALL=(ALL:ALL) NOPASSWD: ALL' \
+  > /etc/sudoers.d/90-drehbert
+chmod 0440 /etc/sudoers.d/90-drehbert
+
+install --directory --owner drehbert --group drehbert --mode 0750 \
+  /opt/drehbert
+
+wifi_file=/etc/NetworkManager/system-connections/drehbert-dev-wifi.nmconnection
+install --directory --mode 0700 /etc/NetworkManager/system-connections
+umask 077
+nmcli --offline connection add \
+  type wifi \
+  con-name drehbert-dev-wifi \
+  connection.uuid 98842240-e52a-4e4e-af28-eab75fc784de \
+  connection.autoconnect yes \
+  ifname wlan0 \
+  ssid "${DREHBERT_DEV_WIFI_SSID}" \
+  wifi.hidden "${DREHBERT_DEV_WIFI_HIDDEN:-no}" \
+  wifi-sec.key-mgmt wpa-psk \
+  wifi-sec.psk "${DREHBERT_DEV_WIFI_PASSWORD}" \
+  ipv4.method auto \
+  ipv6.method auto \
+  > "${wifi_file}"
+chmod 0600 "${wifi_file}"
+
+raspi-config nonint do_wifi_country "${DREHBERT_DEV_WIFI_COUNTRY}"
+
+rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+rm -f /etc/ssh/sshd_config.d/rename_user.conf
+systemctl enable regenerate_ssh_host_keys.service
+systemctl enable ssh.service
+systemctl enable avahi-daemon.service
+systemctl enable NetworkManager.service

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+export DIST_NAME=DrehbertPiOS
+export DIST_VERSION=0.1.0
+
+export RPI_IMAGER_NAME="Drehbert Pi OS"
+export RPI_IMAGER_DESCRIPTION="Drehbert appliance image for Raspberry Pi Zero W"
+export RPI_IMAGER_WEBSITE="https://github.com/guysoft/CustomPiOS"
+
+export BASE_BOARD=raspberrypiarmhf
+export BASE_ARCH=armhf
+export BASE_OS=debian_trixie
+export BASE_DISTRO=raspbian
+export BASE_IMAGE_RASPBIAN=yes
+export BASE_BOOT_PARTITION=1
+export BASE_ROOT_PARTITION=2
+export BASE_BOOT_MOUNT_PATH=boot/firmware
+
+: "${BASE_IMAGE_FILENAME:?BASE_IMAGE_FILENAME is missing}"
+export BASE_ZIP_IMG="${DIST_PATH}/image/${BASE_IMAGE_FILENAME}"
+
+export BASE_ADD_USER=no
+export BASE_USER=drehbert
+export BASE_SSH_ENABLE=no
+: "${DREHBERT_HOSTNAME:?DREHBERT_HOSTNAME is missing}"
+export BASE_OVERRIDE_HOSTNAME="${DREHBERT_HOSTNAME}"
+export BASE_CONFIG_TIMEZONE="Etc/UTC"
+export BASE_CONFIG_MEMSPLIT=default
+
+export BASE_IMAGE_ENLARGEROOT=512
+export BASE_IMAGE_RESIZEROOT=256
+# The cache is bind-mounted outside the image and reused per variant.
+export BASE_APT_CLEAN=no
+export BASE_RELEASE_COMPRESS=yes
+
+# Overridden by the dev/prod variants selected by the wrapper commands.
+export MODULES="base(00.drehbert_common,01.drehbert_app)"

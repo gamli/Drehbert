@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+for group in gpio bluetooth; do
+  getent group "${group}" >/dev/null || groupadd --system "${group}"
+done
+
+if ! id drehbert >/dev/null 2>&1; then
+  useradd \
+    --create-home \
+    --home-dir /opt/drehbert \
+    --shell /usr/sbin/nologin \
+    --user-group \
+    drehbert
+fi
+
+passwd --lock drehbert
+usermod --append --groups gpio,bluetooth drehbert
+install --directory --owner drehbert --group drehbert --mode 0750 \
+  /opt/drehbert \
+  /var/lib/drehbert
+
+# The unit is installed in both images for parity, but only PROD enables it.
+systemctl disable \
+  drehbert.service \
+  sshswitch.service \
+  userconfig.service \
+  >/dev/null 2>&1 || true

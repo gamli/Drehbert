@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+export MODULES="base(00.drehbert_common,01.drehbert_app,02.drehbert_prod)"
+export BASE_RELEASE_IMG_NAME=drehbert-pi-prod-os.img
+export BASE_RELEASE_ZIP_NAME=drehbert-pi-prod-os.img.zip
+export BASE_CONFIG_MEMSPLIT=16

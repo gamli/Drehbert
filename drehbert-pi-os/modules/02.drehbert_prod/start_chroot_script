@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get purge --yes \
+  avahi-daemon \
+  network-manager \
+  openssh-server \
+  triggerhappy \
+  wpasupplicant
+
+rm -f /boot/ssh /boot/firmware/ssh
+
+units_to_mask=(
+  ssh.service
+  sshd.service
+  NetworkManager.service
+  NetworkManager-wait-online.service
+  systemd-networkd-wait-online.service
+  wpa_supplicant.service
+  dhcpcd.service
+  avahi-daemon.service
+  avahi-daemon.socket
+  triggerhappy.service
+  getty@tty1.service
+  serial-getty@serial0.service
+  serial-getty@ttyAMA0.service
+  systemd-timesyncd.service
+  apt-daily.service
+  apt-daily.timer
+  apt-daily-upgrade.service
+  apt-daily-upgrade.timer
+  cron.service
+  dpkg-db-backup.timer
+  logrotate.timer
+  man-db.timer
+)
+
+for unit in "${units_to_mask[@]}"; do
+  systemctl disable "${unit}" >/dev/null 2>&1 || true
+  systemctl mask --force "${unit}"
+done
+
+units_to_disable=(
+  console-setup.service
+  keyboard-setup.service
+  regenerate_ssh_host_keys.service
+  rpi-eeprom-update.service
+)
+
+for unit in "${units_to_disable[@]}"; do
+  systemctl disable "${unit}" >/dev/null 2>&1 || true
+done
+
+boot_config=/boot/firmware/config.txt
+if [[ -f "${boot_config}" ]]; then
+  {
+    printf '\n[all]\n'
+    printf '# Drehbert PROD: headless, Bluetooth stays enabled.\n'
+    printf 'dtoverlay=disable-wifi\n'
+    printf 'disable_splash=1\n'
+    printf 'dtparam=audio=off\n'
+  } >> "${boot_config}"
+fi
+
+boot_cmdline=/boot/firmware/cmdline.txt
+if [[ -f "${boot_cmdline}" ]]; then
+  sed --regexp-extended --in-place \
+    's/(^|[[:space:]])console=(serial0|tty1)(,[^[:space:]]+)?//g; s/[[:space:]]+/ /g; s/^ //; s/ $//' \
+    "${boot_cmdline}"
+fi
+
+systemctl set-default multi-user.target
+systemctl enable bluetooth.service
+systemctl enable drehbert.service
