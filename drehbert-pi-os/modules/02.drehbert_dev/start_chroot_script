@@ -18,12 +18,14 @@ apt-get install --yes --no-install-recommends \
   ca-certificates \
   curl \
   git \
+  liblgpio-dev \
   network-manager \
   openssh-server \
   pkg-config \
   python3-dev \
   rsync \
-  sudo
+  sudo \
+  swig
 
 uv_archive="$(mktemp)"
 uv_directory="$(mktemp --directory)"
