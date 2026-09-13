@@ -1,9 +1,6 @@
-﻿from dataclasses import dataclass, field
-
-import pytest
+﻿import pytest
 
 from drehbert.stepper_motor import StepperMotor, StepperMotorDirection
-from tests.fake_gpio_pin import FakeGpioPin
 from tests.fake_stepper_motor_factory import create_fake_stepper_motor
 
 

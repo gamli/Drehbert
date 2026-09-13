@@ -1,5 +1,5 @@
-﻿from drehbert.gpio_pin import GpioPin
-from gpiozero import OutputDevice
+﻿from gpiozero import OutputDevice
+
 from drehbert.stepper_motor import StepperMotor
 
 

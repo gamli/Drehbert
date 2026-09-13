@@ -1,5 +1,4 @@
 ﻿from dataclasses import field, dataclass
-from typing import Protocol
 
 
 @dataclass
@@ -18,3 +17,7 @@ class FakeGpioPin:
 
     def close(self) -> None:
         self.closed = True
+
+    @property
+    def is_active(self) -> bool:
+        return self.state

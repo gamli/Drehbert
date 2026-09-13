@@ -1,19 +1,19 @@
-﻿from collections.abc import Callable
+﻿import logging
+from collections.abc import Callable
 from enum import Enum
 from time import sleep
 from types import TracebackType
 from typing import Self, Final
 
-from drehbert.gpio_pin import GpioPin
+from drehbert.gpio_pin import GpioOutputPin
 
 
-class StepperMotorDirection(Enum):
-    FORWARD = True
-    REVERSE = False
+class StepperMotorDirection(str, Enum):
+    FORWARD = "forward"
+    REVERSE = "reverse"
 
 
 class StepperMotor:
-    """Drive a stepper motor through a stepper controllers STEP, DIR, and ENABLED inputs."""
 
     FULL_STEPS_PER_REVOLUTION: Final[int] = 200
     MICROSTEPS_PER_FULL_STEP: Final[int] = 16
@@ -21,13 +21,12 @@ class StepperMotor:
     STEPS_PER_SECOND: Final[float] = 400.0
     DIRECTION_SETUP_DELAY_SECONDS: Final[float] = 0.001
 
-
     def __init__(
-        self,
-        step_pin: GpioPin,
-        direction_pin: GpioPin,
-        enable_pin: GpioPin,
-        sleep_function: Callable[[float], None] = sleep,
+            self,
+            step_pin: GpioOutputPin,
+            direction_pin: GpioOutputPin,
+            enable_pin: GpioOutputPin,
+            sleep_function: Callable[[float], None] = sleep,
     ) -> None:
         self._step_pin = step_pin
         self._direction_pin = direction_pin
@@ -37,7 +36,7 @@ class StepperMotor:
 
         self._step_pin.off()
         self._direction_pin.on()
-        self._enable_pin.off() # enable the motor
+        self._enable_pin.off()  # enable the motor
 
     def rotate_one_revolution(self, direction: StepperMotorDirection) -> None:
         self.rotate_steps(self.STEPS_PER_REVOLUTION, direction)
@@ -59,7 +58,7 @@ class StepperMotor:
         half_period_seconds = 0.5 / self.STEPS_PER_SECOND
 
         try:
-            for _ in range(count):
+            for step_idx in range(count):
                 self._step_pin.on()
                 self._sleep(half_period_seconds)
                 self._step_pin.off()
@@ -75,7 +74,7 @@ class StepperMotor:
         self._step_pin.close()
         self._direction_pin.on()
         self._direction_pin.close()
-        self._enable_pin.on() # disables the motor
+        self._enable_pin.on()  # disables the motor
         self._enable_pin.close()
 
         self._closed = True
@@ -86,9 +85,9 @@ class StepperMotor:
         return self
 
     def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
+            self,
+            exc_type: type[BaseException] | None,
+            exc_value: BaseException | None,
+            traceback: TracebackType | None,
     ) -> None:
         self.close()
