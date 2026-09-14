@@ -1,14 +1,13 @@
 ﻿from contextlib import AbstractContextManager
 from inspect import isfunction
-
-from typing import Self, Callable
+from typing import Self, Callable, Any
 
 from gpiozero import GPIODevice
 
 
 class GPIOContextManager(AbstractContextManager):
 
-    def __init__(self, *devices: GPIODevice | Callable[[], None]):
+    def __init__(self, *devices: GPIODevice | Callable[[], Any]):
         self._devices = devices
         self._closed = False
 
@@ -34,5 +33,3 @@ class GPIOContextManager(AbstractContextManager):
     def assert_not_closed(self):
         if self._closed:
             raise RuntimeError("Context manager is already closed")
-
-

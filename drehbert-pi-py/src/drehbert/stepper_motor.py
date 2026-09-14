@@ -6,7 +6,7 @@ from typing import Any, Final
 
 from gpiozero import OutputDevice
 
-from drehbert.constants import GPIO_MOTOR_STEP, GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE
+from drehbert.gpio_constants import GPIO_MOTOR_STEP, GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE
 from drehbert.gpio_context_manager import GPIOContextManager
 
 
@@ -14,17 +14,19 @@ class StepperMotorDirection(str, Enum):
     FORWARD = "forward"
     REVERSE = "reverse"
 
+
 LOGGER = logging.getLogger(__name__)
+
 
 class StepperMotor(GPIOContextManager):
 
     def __init__(
             self,
             *,
-            full_steps_per_revolution = 200,
-            microsteps_per_full_step = 16,
-            set_dir_delay_seconds = 0.001,
-            max_steps_per_second = 100,
+            full_steps_per_revolution=200,
+            microsteps_per_full_step=16,
+            set_dir_delay_seconds=0.001,
+            max_steps_per_second=100,
             sleep_function: Callable[[float], None] = sleep,
             pin_factory: Any | None = None,
     ):
@@ -38,7 +40,9 @@ class StepperMotor(GPIOContextManager):
 
         self._motor_step: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_STEP, pin_factory=pin_factory)
         self._motor_dir: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_DIR, pin_factory=pin_factory)
-        self._motor_enable: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_ENABLE, initial_value=True, active_high=False, pin_factory=pin_factory)
+        self._motor_enable: Final[OutputDevice] = (
+            OutputDevice(GPIO_MOTOR_ENABLE, initial_value=True, active_high=False, pin_factory=pin_factory)
+        )
 
         # noinspection unused-parameter (it is only to convert any lambda return value to none)
         def to_none(*args): return None
@@ -48,6 +52,16 @@ class StepperMotor(GPIOContextManager):
             lambda: to_none(self._motor_dir.off()),
             lambda: to_none(self._motor_enable.off()),
         )
+
+        self._current_step: int = 0
+
+    def reset(self) -> None:
+        self._current_step = 0
+
+    def rotate_to_degrees(self, degrees: float) -> None:
+        target_degrees_steps = round((degrees * self._steps_per_revolution) / 360.0)
+        step_diff = target_degrees_steps - self._current_step
+        self.rotate_steps(step_diff, StepperMotorDirection.FORWARD)
 
     def rotate_one_revolution(self, direction: StepperMotorDirection) -> None:
         self.rotate_steps(self._steps_per_revolution, direction)
@@ -77,6 +91,7 @@ class StepperMotor(GPIOContextManager):
 
     def _advance_one_step_in_current_direction(self):
         try:
+
             half_step_duration_seconds = 0.5 / self._max_steps_per_second
             # turn the pin on for MOTOR_HALF_PERIOD_SECONDS
             self._motor_step.on()
@@ -85,6 +100,12 @@ class StepperMotor(GPIOContextManager):
             self._motor_step.off()
             # wait for the other half of the period for an even pattern
             self._sleep(half_step_duration_seconds)
+
+            if self._motor_dir.is_active:
+                self._current_step = (self._current_step + 1) % self._steps_per_revolution
+            else:
+                self._current_step = (self._current_step - 1) % self._steps_per_revolution
+
         finally:
             # if anything happens, we try to turn the pin off
             self._motor_step.off()

@@ -3,17 +3,17 @@ from typing import Any, Final
 
 from gpiozero import LED
 
-from drehbert.constants import GPIO_LED_ERROR, GPIO_LED_TURNTABLE, GPIO_LED_BLUETOOTH, GPIO_LED_GENERAL
+from drehbert.gpio_constants import GPIO_LED_ERROR, GPIO_LED_TURNTABLE, GPIO_LED_BLUETOOTH, GPIO_LED_GENERAL
 from drehbert.gpio_context_manager import GPIOContextManager
 
 
-class EStatusLEDPattern(str, Enum):
+class EDrehbertLEDPattern(str, Enum):
     OFF = "off"
     ON = "on"
     BLINK = "blink"
 
 
-class StatusLEDs(GPIOContextManager):
+class DrehbertLEDs(GPIOContextManager):
 
     def __init__(self, pin_factory: Any | None = None):
 
@@ -26,35 +26,36 @@ class StatusLEDs(GPIOContextManager):
             def off_close():
                 led.off()
                 led.close()
+
             return off_close
 
         super().__init__(
-             make_off_close(self._led_general),
-             make_off_close(self._led_bluetooth),
-             make_off_close(self._led_turntable),
-             make_off_close(self._led_error),
+            make_off_close(self._led_general),
+            make_off_close(self._led_bluetooth),
+            make_off_close(self._led_turntable),
+            make_off_close(self._led_error),
         )
 
-    def general(self, pattern: EStatusLEDPattern) -> None:
+    def general(self, pattern: EDrehbertLEDPattern) -> None:
         self._set_pattern(self._led_general, pattern)
 
-    def bluetooth(self, pattern: EStatusLEDPattern) -> None:
+    def bluetooth(self, pattern: EDrehbertLEDPattern) -> None:
         self._set_pattern(self._led_bluetooth, pattern)
 
-    def turntable(self, pattern: EStatusLEDPattern) -> None:
+    def turntable(self, pattern: EDrehbertLEDPattern) -> None:
         self._set_pattern(self._led_turntable, pattern)
 
-    def error(self, pattern: EStatusLEDPattern) -> None:
+    def error(self, pattern: EDrehbertLEDPattern) -> None:
         self._set_pattern(self._led_error, pattern)
 
-    def _set_pattern(self, led: LED, pattern: EStatusLEDPattern) -> None:
+    def _set_pattern(self, led: LED, pattern: EDrehbertLEDPattern) -> None:
         self.assert_not_closed()
 
-        if pattern == EStatusLEDPattern.OFF:
+        if pattern == EDrehbertLEDPattern.OFF:
             led.off()
-        elif pattern == EStatusLEDPattern.ON:
+        elif pattern == EDrehbertLEDPattern.ON:
             led.on()
-        elif pattern == EStatusLEDPattern.BLINK:
+        elif pattern == EDrehbertLEDPattern.BLINK:
             led.blink()
         else:
             raise ValueError(f"Invalid pattern: {pattern}")
