@@ -2,92 +2,100 @@
 from collections.abc import Callable
 from enum import Enum
 from time import sleep
-from types import TracebackType
-from typing import Self, Final
+from typing import Any, Final
 
-from drehbert.gpio_pin import GpioOutputPin
+from gpiozero import OutputDevice
+
+from drehbert.constants import GPIO_MOTOR_STEP, GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE
+from drehbert.gpio_context_manager import GPIOContextManager
 
 
 class StepperMotorDirection(str, Enum):
     FORWARD = "forward"
     REVERSE = "reverse"
 
+LOGGER = logging.getLogger(__name__)
 
-class StepperMotor:
-
-    FULL_STEPS_PER_REVOLUTION: Final[int] = 200
-    MICROSTEPS_PER_FULL_STEP: Final[int] = 16
-    STEPS_PER_REVOLUTION: Final[int] = FULL_STEPS_PER_REVOLUTION * MICROSTEPS_PER_FULL_STEP
-    STEPS_PER_SECOND: Final[float] = 400.0
-    DIRECTION_SETUP_DELAY_SECONDS: Final[float] = 0.001
+class StepperMotor(GPIOContextManager):
 
     def __init__(
             self,
-            step_pin: GpioOutputPin,
-            direction_pin: GpioOutputPin,
-            enable_pin: GpioOutputPin,
+            *,
+            full_steps_per_revolution = 200,
+            microsteps_per_full_step = 16,
+            set_dir_delay_seconds = 0.001,
+            max_steps_per_second = 100,
             sleep_function: Callable[[float], None] = sleep,
-    ) -> None:
-        self._step_pin = step_pin
-        self._direction_pin = direction_pin
-        self._enable_pin = enable_pin
-        self._sleep = sleep_function
-        self._closed = False
+            pin_factory: Any | None = None,
+    ):
+        self._full_steps_per_revolution: Final[int] = full_steps_per_revolution
+        self._microsteps_per_full_step: Final[int] = microsteps_per_full_step
+        self._steps_per_revolution: Final[int] = full_steps_per_revolution * microsteps_per_full_step
+        self._set_dir_delay_seconds: Final[float] = set_dir_delay_seconds
+        self._max_steps_per_second: Final[int] = max_steps_per_second
 
-        self._step_pin.off()
-        self._direction_pin.on()
-        self._enable_pin.off()  # enable the motor
+        self._sleep: Final[Callable[[float], None]] = sleep_function
+
+        self._motor_step: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_STEP, pin_factory=pin_factory)
+        self._motor_dir: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_DIR, pin_factory=pin_factory)
+        self._motor_enable: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_ENABLE, initial_value=True, active_high=False, pin_factory=pin_factory)
+
+        # noinspection unused-parameter (it is only to convert any lambda return value to none)
+        def to_none(*args): return None
+
+        super().__init__(
+            lambda: to_none(self._motor_step.off()),
+            lambda: to_none(self._motor_dir.off()),
+            lambda: to_none(self._motor_enable.off()),
+        )
 
     def rotate_one_revolution(self, direction: StepperMotorDirection) -> None:
-        self.rotate_steps(self.STEPS_PER_REVOLUTION, direction)
+        self.rotate_steps(self._steps_per_revolution, direction)
 
-    def rotate_steps(self, count: int, direction: StepperMotorDirection) -> None:
-        if self._closed:
-            raise RuntimeError("Motor is already closed")
-        if count < 0:
-            raise ValueError("Microstep count must not be negative")
-        if count == 0:
+    def rotate_steps(self, step_count: int, direction: StepperMotorDirection) -> None:
+        self.assert_not_closed()
+
+        # not really needed, but saves a bit of time on zero steps
+        if step_count == 0:
             return
 
-        if direction is StepperMotorDirection.FORWARD:
-            self._direction_pin.on()
-        else:
-            self._direction_pin.off()
+        # we support negative steps by reversing the direction
+        if step_count < 0:
+            step_count = -step_count
+            if direction is StepperMotorDirection.FORWARD:
+                direction = StepperMotorDirection.REVERSE
+            else:
+                direction = StepperMotorDirection.FORWARD
 
-        self._sleep(self.DIRECTION_SETUP_DELAY_SECONDS)
-        half_period_seconds = 0.5 / self.STEPS_PER_SECOND
+        self._set_dir(direction)
 
+        # LOGGER.info(f"Start revolution ENABLE={self._motor_enable.is_active} ; DIR={self._motor_dir.value}/{direction}")
+
+        for step_idx in range(step_count):
+            # LOGGER.info(f"Step {step_idx} ENABLE={self._motor_enable.is_active} ; DIR={self._motor_dir.value}/{direction}")
+            self._advance_one_step_in_current_direction()
+
+    def _advance_one_step_in_current_direction(self):
         try:
-            for step_idx in range(count):
-                self._step_pin.on()
-                self._sleep(half_period_seconds)
-                self._step_pin.off()
-                self._sleep(half_period_seconds)
+            half_step_duration_seconds = 0.5 / self._max_steps_per_second
+            # turn the pin on for MOTOR_HALF_PERIOD_SECONDS
+            self._motor_step.on()
+            self._sleep(half_step_duration_seconds)
+            # and turn the pin off again
+            self._motor_step.off()
+            # wait for the other half of the period for an even pattern
+            self._sleep(half_step_duration_seconds)
         finally:
-            self._step_pin.off()
+            # if anything happens, we try to turn the pin off
+            self._motor_step.off()
 
-    def close(self) -> None:
-        if self._closed:
-            return
-
-        self._step_pin.off()
-        self._step_pin.close()
-        self._direction_pin.on()
-        self._direction_pin.close()
-        self._enable_pin.on()  # disables the motor
-        self._enable_pin.close()
-
-        self._closed = True
-
-    def __enter__(self) -> Self:
-        if self._closed:
-            raise RuntimeError("Motor is already closed")
-        return self
-
-    def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc_value: BaseException | None,
-            traceback: TracebackType | None,
-    ) -> None:
-        self.close()
+    def _set_dir(self, direction: StepperMotorDirection):
+        # we only change the pin and wait if the direction actually changed
+        if direction is StepperMotorDirection.FORWARD:
+            if not self._motor_dir.is_active:
+                self._motor_dir.on()
+                self._sleep(self._set_dir_delay_seconds)
+        else:
+            if self._motor_dir.is_active:
+                self._motor_dir.off()
+                self._sleep(self._set_dir_delay_seconds)

@@ -1,25 +1,25 @@
 ﻿import logging
+from time import sleep
 
-from drehbert.status_lights import EStatusLightPattern
-from drehbert.status_lights_factory import create_status_lights_on_raspi_gpio
-from drehbert.stepper_motor_factory import create_stepper_motor_on_a4988_on_raspi_gpio
-from drehbert.stepper_motor import StepperMotorDirection
+from drehbert.status_leds import EStatusLEDPattern, StatusLEDs
+from drehbert.stepper_motor import StepperMotorDirection, StepperMotor
 
 LOGGER = logging.getLogger(__name__)
 
 
 def main() -> int:
-    """Rotate the turntable once and exit."""
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    with create_status_lights_on_raspi_gpio() as status_lights:
-        with create_stepper_motor_on_a4988_on_raspi_gpio() as motor:
-            status_lights.set_general_pattern(EStatusLightPattern.ON)
-            status_lights.set_bluetooth_pattern(EStatusLightPattern.BLINK)
-            status_lights.set_turntable_pattern(EStatusLightPattern.OFF)
-            status_lights.set_error_pattern(EStatusLightPattern.ON)
-            motor.rotate_one_revolution(StepperMotorDirection.FORWARD)
+    with StatusLEDs() as status_leds:
+        with StepperMotor() as motor:
+            status_leds.general(EStatusLEDPattern.ON)
+            status_leds.bluetooth(EStatusLEDPattern.BLINK)
+            status_leds.turntable(EStatusLEDPattern.OFF)
+            status_leds.error(EStatusLEDPattern.ON)
+            for _ in range(100):
+                motor.rotate_steps(step_count=32, direction=StepperMotorDirection.FORWARD)
+                sleep(2)
 
     LOGGER.info("Revolution complete")
 
