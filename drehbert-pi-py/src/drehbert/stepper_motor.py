@@ -20,35 +20,28 @@ class StepperMotor(GPIOContextManager):
     def __init__(
             self,
             *,
-            full_steps_per_revolution: int = 200,
-            configured_microsteps_per_full_step: int = 16,
+            steps_per_revolution: int = 3200,
             set_dir_delay_seconds: float = 0.001,
-            microsteps_per_second: int = 400,
+            steps_per_second: float = 400.0,
             step_pulse_seconds: float = 0.000_010,
             sleep_function: Callable[[float], None] = sleep,
             pin_factory: Any | None = None,
     ):
-        self._require_positive_int("full_steps_per_revolution", full_steps_per_revolution)
-        self._require_positive_int(
-            "configured_microsteps_per_full_step",
-            configured_microsteps_per_full_step,
+        self._require_positive_int("steps_per_revolution", steps_per_revolution)
+        self._require_non_negative_finite_number(
+            "set_dir_delay_seconds",
+            set_dir_delay_seconds,
         )
-        self._require_positive_int("microsteps_per_second", microsteps_per_second)
+        self._require_positive_finite_number("steps_per_second", steps_per_second)
+        self._require_positive_finite_number("step_pulse_seconds", step_pulse_seconds)
 
-        if set_dir_delay_seconds < 0:
-            raise ValueError("set_dir_delay_seconds must not be negative")
-        if step_pulse_seconds <= 0:
-            raise ValueError("step_pulse_seconds must be greater than zero")
-
-        step_period_seconds = 1.0 / microsteps_per_second
+        step_period_seconds = 1.0 / steps_per_second
         if step_pulse_seconds >= step_period_seconds:
             raise ValueError(
-                "step_pulse_seconds must be shorter than one microstep period"
+                "step_pulse_seconds must be shorter than one step period"
             )
 
-        self._steps_per_revolution: Final[int] = (
-            full_steps_per_revolution * configured_microsteps_per_full_step
-        )
+        self._steps_per_revolution: Final[int] = steps_per_revolution
         self._set_dir_delay_seconds: Final[float] = set_dir_delay_seconds
         self._step_period_seconds: Final[float] = step_period_seconds
         self._step_pulse_seconds: Final[float] = step_pulse_seconds
@@ -96,7 +89,7 @@ class StepperMotor(GPIOContextManager):
             direction: StepperMotorDirection,
     ) -> None:
         self.assert_not_closed()
-        self._validate_direction(direction)
+        self._require_direction(direction)
 
         if not isfinite(degrees):
             raise ValueError("degrees must be finite")
@@ -121,10 +114,8 @@ class StepperMotor(GPIOContextManager):
 
     def rotate_steps(self, step_count: int, direction: StepperMotorDirection) -> None:
         self.assert_not_closed()
-        self._validate_direction(direction)
-
-        if isinstance(step_count, bool) or not isinstance(step_count, int):
-            raise TypeError("step_count must be an integer")
+        self._require_direction(direction)
+        self._require_int("step_count", step_count)
 
         if step_count == 0:
             return
@@ -172,11 +163,28 @@ class StepperMotor(GPIOContextManager):
         return StepperMotorDirection.FORWARD
 
     @staticmethod
-    def _validate_direction(direction: StepperMotorDirection) -> None:
+    def _require_direction(direction: StepperMotorDirection) -> None:
         if not isinstance(direction, StepperMotorDirection):
             raise TypeError("direction must be a StepperMotorDirection")
 
-    @staticmethod
-    def _require_positive_int(name: str, value: int) -> None:
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+    @classmethod
+    def _require_positive_int(cls, name: str, value: int) -> None:
+        cls._require_int(name, value)
+        if value <= 0:
             raise ValueError(f"{name} must be a positive integer")
+
+    @staticmethod
+    def _require_int(name: str, value: int) -> None:
+        # bool is a subclass of int in Python, but is not a meaningful step count.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be an integer")
+
+    @staticmethod
+    def _require_positive_finite_number(name: str, value: float) -> None:
+        if not isfinite(value) or value <= 0:
+            raise ValueError(f"{name} must be finite and greater than zero")
+
+    @staticmethod
+    def _require_non_negative_finite_number(name: str, value: float) -> None:
+        if not isfinite(value) or value < 0:
+            raise ValueError(f"{name} must be finite and not negative")

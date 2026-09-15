@@ -4,7 +4,6 @@ from typing import Any, Self
 
 from gpiozero import GPIODevice
 
-
 type GPIOResource = GPIODevice | Callable[[], Any]
 
 

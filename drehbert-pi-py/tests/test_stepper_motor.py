@@ -17,9 +17,8 @@ def make_motor(
         sleep_calls = []
 
     return StepperMotor(
-        full_steps_per_revolution=4,
-        configured_microsteps_per_full_step=1,
-        microsteps_per_second=100,
+        steps_per_revolution=4,
+        steps_per_second=100,
         step_pulse_seconds=0.001,
         sleep_function=sleep_calls.append,
         pin_factory=pin_factory,
@@ -74,18 +73,33 @@ def test_close_disables_driver_and_releases_all_gpio_devices(
 @pytest.mark.parametrize(
     ("argument", "value"),
     [
-        ("full_steps_per_revolution", 0),
-        ("configured_microsteps_per_full_step", 0),
-        ("microsteps_per_second", 0),
+        ("steps_per_revolution", 0),
+        ("steps_per_second", 0),
     ],
 )
-def test_integer_configuration_must_be_positive(
+def test_step_configuration_must_be_positive(
         pin_factory: MockFactory,
         argument: str,
-        value: int,
+        value: int | float,
 ) -> None:
-    with pytest.raises(ValueError, match="positive integer"):
+    with pytest.raises(ValueError, match=r"greater than zero|positive integer"):
         StepperMotor(pin_factory=pin_factory, **{argument: value})
+
+
+@pytest.mark.parametrize("step_count", [True, 1.5])
+def test_step_count_must_be_an_integer(
+        pin_factory: MockFactory,
+        step_count: object,
+) -> None:
+    motor = make_motor(pin_factory)
+
+    with pytest.raises(TypeError, match="step_count must be an integer"):
+        motor.rotate_steps(  # type: ignore[arg-type]
+            step_count,
+            StepperMotorDirection.FORWARD,
+        )
+
+    motor.close()
 
 
 def test_invalid_direction_is_rejected(pin_factory: MockFactory) -> None:
