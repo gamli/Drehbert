@@ -8,7 +8,7 @@ class MockDrehbertContextManager(DrehbertContextManager):
         self._close_count = 0
 
     def _close(self) -> None:
-        self._close_count = 1
+        self._close_count += 1
 
 
 def test_context_manager_enters_and_exits() -> None:
