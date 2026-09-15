@@ -1,21 +1,18 @@
-﻿import logging
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
+from math import isfinite
 from time import sleep
 from typing import Any, Final
 
 from gpiozero import OutputDevice
 
-from drehbert.gpio_constants import GPIO_MOTOR_STEP, GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE
+from drehbert.gpio_constants import GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE, GPIO_MOTOR_STEP
 from drehbert.gpio_context_manager import GPIOContextManager
 
 
-class StepperMotorDirection(str, Enum):
+class StepperMotorDirection(StrEnum):
     FORWARD = "forward"
     REVERSE = "reverse"
-
-
-LOGGER = logging.getLogger(__name__)
 
 
 class StepperMotor(GPIOContextManager):
@@ -23,100 +20,171 @@ class StepperMotor(GPIOContextManager):
     def __init__(
             self,
             *,
-            full_steps_per_revolution=200,
-            microsteps_per_full_step=16,
-            set_dir_delay_seconds=0.001,
-            max_steps_per_second=100,
+            steps_per_revolution: int = 3200,
+            set_dir_delay_seconds: float = 0.001,
+            steps_per_second: float = 400.0,
+            step_pulse_seconds: float = 0.000_010,
             sleep_function: Callable[[float], None] = sleep,
             pin_factory: Any | None = None,
     ):
-        self._full_steps_per_revolution: Final[int] = full_steps_per_revolution
-        self._microsteps_per_full_step: Final[int] = microsteps_per_full_step
-        self._steps_per_revolution: Final[int] = full_steps_per_revolution * microsteps_per_full_step
-        self._set_dir_delay_seconds: Final[float] = set_dir_delay_seconds
-        self._max_steps_per_second: Final[int] = max_steps_per_second
+        self._require_positive_int("steps_per_revolution", steps_per_revolution)
+        self._require_non_negative_finite_number(
+            "set_dir_delay_seconds",
+            set_dir_delay_seconds,
+        )
+        self._require_positive_finite_number("steps_per_second", steps_per_second)
+        self._require_positive_finite_number("step_pulse_seconds", step_pulse_seconds)
 
+        step_period_seconds = 1.0 / steps_per_second
+        if step_pulse_seconds >= step_period_seconds:
+            raise ValueError(
+                "step_pulse_seconds must be shorter than one step period"
+            )
+
+        self._steps_per_revolution: Final[int] = steps_per_revolution
+        self._set_dir_delay_seconds: Final[float] = set_dir_delay_seconds
+        self._step_period_seconds: Final[float] = step_period_seconds
+        self._step_pulse_seconds: Final[float] = step_pulse_seconds
         self._sleep: Final[Callable[[float], None]] = sleep_function
 
-        self._motor_step: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_STEP, pin_factory=pin_factory)
-        self._motor_dir: Final[OutputDevice] = OutputDevice(GPIO_MOTOR_DIR, pin_factory=pin_factory)
-        self._motor_enable: Final[OutputDevice] = (
-            OutputDevice(GPIO_MOTOR_ENABLE, initial_value=True, active_high=False, pin_factory=pin_factory)
+        self._motor_step: Final[OutputDevice] = OutputDevice(
+            GPIO_MOTOR_STEP,
+            pin_factory=pin_factory,
+        )
+        self._motor_dir: Final[OutputDevice] = OutputDevice(
+            GPIO_MOTOR_DIR,
+            pin_factory=pin_factory,
+        )
+        self._motor_enable: Final[OutputDevice] = OutputDevice(
+            GPIO_MOTOR_ENABLE,
+            initial_value=True,
+            active_high=False,
+            pin_factory=pin_factory,
         )
 
-        # noinspection unused-parameter (it is only to convert any lambda return value to none)
-        def to_none(*args): return None
+        def make_off_close(device: OutputDevice) -> Callable[[], None]:
+            def off_close() -> None:
+                device.off()
+                device.close()
 
+            return off_close
+
+        # Cleanup runs in reverse order, disabling the driver before releasing
+        # the direction and step pins.
         super().__init__(
-            lambda: to_none(self._motor_step.off()),
-            lambda: to_none(self._motor_dir.off()),
-            lambda: to_none(self._motor_enable.off()),
+            make_off_close(self._motor_step),
+            make_off_close(self._motor_dir),
+            make_off_close(self._motor_enable),
         )
 
-        self._current_step: int = 0
-
-    def reset(self) -> None:
         self._current_step = 0
 
-    def rotate_to_degrees(self, degrees: float) -> None:
-        target_degrees_steps = round((degrees * self._steps_per_revolution) / 360.0)
-        step_diff = target_degrees_steps - self._current_step
-        self.rotate_steps(step_diff, StepperMotorDirection.FORWARD)
+    def set_current_position_as_zero(self) -> None:
+        self.assert_not_closed()
+        self._current_step = 0
+
+    def rotate_to_degrees(
+            self,
+            degrees: float,
+            direction: StepperMotorDirection,
+    ) -> None:
+        self.assert_not_closed()
+        self._require_direction(direction)
+
+        if not isfinite(degrees):
+            raise ValueError("degrees must be finite")
+
+        target_step = round(
+            degrees * self._steps_per_revolution / 360.0
+        ) % self._steps_per_revolution
+
+        if direction is StepperMotorDirection.FORWARD:
+            step_count = (
+                target_step - self._current_step
+            ) % self._steps_per_revolution
+        else:
+            step_count = (
+                self._current_step - target_step
+            ) % self._steps_per_revolution
+
+        self.rotate_steps(step_count, direction)
 
     def rotate_one_revolution(self, direction: StepperMotorDirection) -> None:
         self.rotate_steps(self._steps_per_revolution, direction)
 
     def rotate_steps(self, step_count: int, direction: StepperMotorDirection) -> None:
         self.assert_not_closed()
+        self._require_direction(direction)
+        self._require_int("step_count", step_count)
 
-        # not really needed, but saves a bit of time on zero steps
         if step_count == 0:
             return
 
-        # we support negative steps by reversing the direction
         if step_count < 0:
             step_count = -step_count
-            if direction is StepperMotorDirection.FORWARD:
-                direction = StepperMotorDirection.REVERSE
-            else:
-                direction = StepperMotorDirection.FORWARD
+            direction = self._reverse_direction(direction)
 
         self._set_dir(direction)
 
-        # LOGGER.info(f"Start revolution ENABLE={self._motor_enable.is_active} ; DIR={self._motor_dir.value}/{direction}")
-
-        for step_idx in range(step_count):
-            # LOGGER.info(f"Step {step_idx} ENABLE={self._motor_enable.is_active} ; DIR={self._motor_dir.value}/{direction}")
+        for _ in range(step_count):
             self._advance_one_step_in_current_direction()
 
-    def _advance_one_step_in_current_direction(self):
+    def _advance_one_step_in_current_direction(self) -> None:
         try:
-
-            half_step_duration_seconds = 0.5 / self._max_steps_per_second
-            # turn the pin on for MOTOR_HALF_PERIOD_SECONDS
             self._motor_step.on()
-            self._sleep(half_step_duration_seconds)
-            # and turn the pin off again
+            self._sleep(self._step_pulse_seconds)
             self._motor_step.off()
-            # wait for the other half of the period for an even pattern
-            self._sleep(half_step_duration_seconds)
 
+            # The A4988 advances on the STEP rising edge. Record the step before
+            # waiting out the low part of the period.
             if self._motor_dir.is_active:
-                self._current_step = (self._current_step + 1) % self._steps_per_revolution
+                self._current_step = (
+                    self._current_step + 1
+                ) % self._steps_per_revolution
             else:
-                self._current_step = (self._current_step - 1) % self._steps_per_revolution
+                self._current_step = (
+                    self._current_step - 1
+                ) % self._steps_per_revolution
 
+            self._sleep(self._step_period_seconds - self._step_pulse_seconds)
         finally:
-            # if anything happens, we try to turn the pin off
             self._motor_step.off()
 
-    def _set_dir(self, direction: StepperMotorDirection):
-        # we only change the pin and wait if the direction actually changed
+    def _set_dir(self, direction: StepperMotorDirection) -> None:
+        requested_pin_state = direction is StepperMotorDirection.FORWARD
+        if self._motor_dir.is_active != requested_pin_state:
+            self._motor_dir.value = requested_pin_state
+            self._sleep(self._set_dir_delay_seconds)
+
+    @staticmethod
+    def _reverse_direction(direction: StepperMotorDirection) -> StepperMotorDirection:
         if direction is StepperMotorDirection.FORWARD:
-            if not self._motor_dir.is_active:
-                self._motor_dir.on()
-                self._sleep(self._set_dir_delay_seconds)
-        else:
-            if self._motor_dir.is_active:
-                self._motor_dir.off()
-                self._sleep(self._set_dir_delay_seconds)
+            return StepperMotorDirection.REVERSE
+        return StepperMotorDirection.FORWARD
+
+    @staticmethod
+    def _require_direction(direction: StepperMotorDirection) -> None:
+        if not isinstance(direction, StepperMotorDirection):
+            raise TypeError("direction must be a StepperMotorDirection")
+
+    @classmethod
+    def _require_positive_int(cls, name: str, value: int) -> None:
+        cls._require_int(name, value)
+        if value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+
+    @staticmethod
+    def _require_int(name: str, value: int) -> None:
+        # bool is a subclass of int in Python, but is not a meaningful step count.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{name} must be an integer")
+
+    @staticmethod
+    def _require_positive_finite_number(name: str, value: float) -> None:
+        if not isfinite(value) or value <= 0:
+            raise ValueError(f"{name} must be finite and greater than zero")
+
+    @staticmethod
+    def _require_non_negative_finite_number(name: str, value: float) -> None:
+        if not isfinite(value) or value < 0:
+            raise ValueError(f"{name} must be finite and not negative")
