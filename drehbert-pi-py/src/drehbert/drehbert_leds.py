@@ -1,10 +1,10 @@
 ﻿from enum import Enum
-from typing import Any, Final
+from typing import Any, Final, override
 
 from gpiozero import LED
 
-from drehbert.gpio_constants import GPIO_LED_ERROR, GPIO_LED_TURNTABLE, GPIO_LED_BLUETOOTH, GPIO_LED_GENERAL
 from drehbert.drehbert_context_manager import DrehbertContextManager
+from drehbert.gpio_constants import GPIO_LED_ERROR, GPIO_LED_TURNTABLE, GPIO_LED_BLUETOOTH, GPIO_LED_GENERAL
 
 
 class EDrehbertLEDPattern(str, Enum):
@@ -23,7 +23,9 @@ class DrehbertLEDs(DrehbertContextManager):
         self._led_scan: Final[LED] = LED(GPIO_LED_TURNTABLE, pin_factory=pin_factory)
         self._led_error: Final[LED] = LED(GPIO_LED_ERROR, pin_factory=pin_factory)
 
+    @override
     def _close(self) -> None:
+
         self._led_general.off()
         self._led_general.close()
 

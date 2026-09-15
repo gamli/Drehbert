@@ -1,11 +1,11 @@
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Any
+from typing import Any, override
 
 from gpiozero import Button
 
-from drehbert.gpio_constants import GPIO_BUTTON_BLUETOOTH, GPIO_BUTTON_SCAN
 from drehbert.drehbert_context_manager import DrehbertContextManager
+from drehbert.gpio_constants import GPIO_BUTTON_BLUETOOTH, GPIO_BUTTON_SCAN
 
 
 class EButtonGesture(StrEnum):
@@ -24,19 +24,7 @@ class DrehbertButtons(DrehbertContextManager):
         if long_press_threshold <= 0:
             raise ValueError("long_press_threshold must be greater than zero")
 
-        self.when_scan_button_gesture: ButtonGestureHandler | None = None
         self.when_bluetooth_button_gesture: ButtonGestureHandler | None = None
-
-        self._scan_button = Button(
-            GPIO_BUTTON_SCAN,
-            hold_time=long_press_threshold,
-            pin_factory=pin_factory,
-        )
-        self._register_gpiozero_button_gestures(
-            self._scan_button,
-            lambda: self.when_scan_button_gesture,
-        )
-
         self._bluetooth_button = Button(
             GPIO_BUTTON_BLUETOOTH,
             hold_time=long_press_threshold,
@@ -47,18 +35,32 @@ class DrehbertButtons(DrehbertContextManager):
             lambda: self.when_bluetooth_button_gesture,
         )
 
-    def _close(self) -> None:
-        self._scan_button.close()
-        self.when_scan_button_gesture = None
+        self.when_scan_button_gesture: ButtonGestureHandler | None = None
+        self._scan_button = Button(
+            GPIO_BUTTON_SCAN,
+            hold_time=long_press_threshold,
+            pin_factory=pin_factory,
+        )
+        self._register_gpiozero_button_gestures(
+            self._scan_button,
+            lambda: self.when_scan_button_gesture,
+        )
 
-        self._bluetooth_button.close()
+    @override
+    def _close(self) -> None:
+
         self.when_bluetooth_button_gesture = None
+        self._bluetooth_button.close()
+
+        self.when_scan_button_gesture = None
+        self._scan_button.close()
 
     @staticmethod
     def _register_gpiozero_button_gestures(
             button: Button,
             get_handler: Callable[[], ButtonGestureHandler | None],
     ) -> None:
+
         was_held = False
 
         def when_pressed() -> None:

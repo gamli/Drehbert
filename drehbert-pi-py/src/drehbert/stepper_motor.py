@@ -2,12 +2,12 @@ from collections.abc import Callable
 from enum import StrEnum
 from math import isfinite
 from time import sleep
-from typing import Any, Final
+from typing import Any, Final, override
 
 from gpiozero import OutputDevice
 
-from drehbert.gpio_constants import GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE, GPIO_MOTOR_STEP
 from drehbert.drehbert_context_manager import DrehbertContextManager
+from drehbert.gpio_constants import GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE, GPIO_MOTOR_STEP
 
 
 class StepperMotorDirection(StrEnum):
@@ -66,14 +66,19 @@ class StepperMotor(DrehbertContextManager):
 
         self._current_step = 0
 
+    @override
     def _close(self) -> None:
+
+        # we have to disable the motor first before turning off and closing the pins
+        self._motor_enable.off()
+
         self._motor_step.off()
         self._motor_step.close()
 
         self._motor_dir.off()
         self._motor_dir.close()
 
-        self._motor_enable.off()
+        # we have to close the motor enable pin last so it isn't enabled accidentally while cleaning up the other pins
         self._motor_enable.close()
 
     def set_current_position_as_zero(self) -> None:
