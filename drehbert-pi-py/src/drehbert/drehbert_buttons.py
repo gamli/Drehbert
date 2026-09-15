@@ -5,7 +5,7 @@ from typing import Any
 from gpiozero import Button
 
 from drehbert.gpio_constants import GPIO_BUTTON_BLUETOOTH, GPIO_BUTTON_SCAN
-from drehbert.gpio_context_manager import GPIOContextManager
+from drehbert.drehbert_context_manager import DrehbertContextManager
 
 
 class EButtonGesture(StrEnum):
@@ -16,9 +16,11 @@ class EButtonGesture(StrEnum):
 type ButtonGestureHandler = Callable[[EButtonGesture], None]
 
 
-class DrehbertButtons(GPIOContextManager):
+class DrehbertButtons(DrehbertContextManager):
 
     def __init__(self, long_press_threshold: float = 3.0, pin_factory: Any | None = None):
+        super().__init__()
+
         if long_press_threshold <= 0:
             raise ValueError("long_press_threshold must be greater than zero")
 
@@ -45,15 +47,12 @@ class DrehbertButtons(GPIOContextManager):
             lambda: self.when_bluetooth_button_gesture,
         )
 
-        def clear_gesture_handlers() -> None:
-            self.when_scan_button_gesture = None
-            self.when_bluetooth_button_gesture = None
+    def _close(self) -> None:
+        self._scan_button.close()
+        self.when_scan_button_gesture = None
 
-        super().__init__(
-            self._scan_button,
-            self._bluetooth_button,
-            clear_gesture_handlers,
-        )
+        self._bluetooth_button.close()
+        self.when_bluetooth_button_gesture = None
 
     @staticmethod
     def _register_gpiozero_button_gestures(

@@ -7,7 +7,7 @@ from typing import Any, Final
 from gpiozero import OutputDevice
 
 from drehbert.gpio_constants import GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE, GPIO_MOTOR_STEP
-from drehbert.gpio_context_manager import GPIOContextManager
+from drehbert.drehbert_context_manager import DrehbertContextManager
 
 
 class StepperMotorDirection(StrEnum):
@@ -15,7 +15,7 @@ class StepperMotorDirection(StrEnum):
     REVERSE = "reverse"
 
 
-class StepperMotor(GPIOContextManager):
+class StepperMotor(DrehbertContextManager):
 
     def __init__(
             self,
@@ -27,6 +27,8 @@ class StepperMotor(GPIOContextManager):
             sleep_function: Callable[[float], None] = sleep,
             pin_factory: Any | None = None,
     ):
+        super().__init__()
+
         self._require_positive_int("steps_per_revolution", steps_per_revolution)
         self._require_non_negative_finite_number(
             "set_dir_delay_seconds",
@@ -62,25 +64,20 @@ class StepperMotor(GPIOContextManager):
             pin_factory=pin_factory,
         )
 
-        def make_off_close(device: OutputDevice) -> Callable[[], None]:
-            def off_close() -> None:
-                device.off()
-                device.close()
-
-            return off_close
-
-        # Cleanup runs in reverse order, disabling the driver before releasing
-        # the direction and step pins.
-        super().__init__(
-            make_off_close(self._motor_step),
-            make_off_close(self._motor_dir),
-            make_off_close(self._motor_enable),
-        )
-
         self._current_step = 0
 
+    def _close(self) -> None:
+        self._motor_step.off()
+        self._motor_step.close()
+
+        self._motor_dir.off()
+        self._motor_dir.close()
+
+        self._motor_enable.off()
+        self._motor_enable.close()
+
     def set_current_position_as_zero(self) -> None:
-        self.assert_not_closed()
+        self._assert_not_closed()
         self._current_step = 0
 
     def rotate_to_degrees(
@@ -88,7 +85,7 @@ class StepperMotor(GPIOContextManager):
             degrees: float,
             direction: StepperMotorDirection,
     ) -> None:
-        self.assert_not_closed()
+        self._assert_not_closed()
         self._require_direction(direction)
 
         if not isfinite(degrees):
@@ -100,12 +97,12 @@ class StepperMotor(GPIOContextManager):
 
         if direction is StepperMotorDirection.FORWARD:
             step_count = (
-                target_step - self._current_step
-            ) % self._steps_per_revolution
+                                 target_step - self._current_step
+                         ) % self._steps_per_revolution
         else:
             step_count = (
-                self._current_step - target_step
-            ) % self._steps_per_revolution
+                                 self._current_step - target_step
+                         ) % self._steps_per_revolution
 
         self.rotate_steps(step_count, direction)
 
@@ -113,7 +110,7 @@ class StepperMotor(GPIOContextManager):
         self.rotate_steps(self._steps_per_revolution, direction)
 
     def rotate_steps(self, step_count: int, direction: StepperMotorDirection) -> None:
-        self.assert_not_closed()
+        self._assert_not_closed()
         self._require_direction(direction)
         self._require_int("step_count", step_count)
 
@@ -139,12 +136,12 @@ class StepperMotor(GPIOContextManager):
             # waiting out the low part of the period.
             if self._motor_dir.is_active:
                 self._current_step = (
-                    self._current_step + 1
-                ) % self._steps_per_revolution
+                                             self._current_step + 1
+                                     ) % self._steps_per_revolution
             else:
                 self._current_step = (
-                    self._current_step - 1
-                ) % self._steps_per_revolution
+                                             self._current_step - 1
+                                     ) % self._steps_per_revolution
 
             self._sleep(self._step_period_seconds - self._step_pulse_seconds)
         finally:
