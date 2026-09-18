@@ -35,29 +35,29 @@ class DrehbertLEDs(DrehbertContextManager):
     @override
     def _close(self) -> None:
 
-        self._led_general.get().off()
-        self._led_general.get().close()
+        self._led_general().off()
+        self._led_general().close()
 
-        self._led_bluetooth.get().off()
-        self._led_bluetooth.get().close()
+        self._led_bluetooth().off()
+        self._led_bluetooth().close()
 
-        self._led_scan.get().off()
-        self._led_scan.get().close()
+        self._led_scan().off()
+        self._led_scan().close()
 
-        self._led_error.get().off()
-        self._led_error.get().close()
+        self._led_error().off()
+        self._led_error().close()
 
     def general(self, pattern: EDrehbertLEDPattern) -> None:
-        self._set_pattern(self._led_general.get(), pattern)
+        self._set_pattern(self._led_general(), pattern)
 
     def bluetooth(self, pattern: EDrehbertLEDPattern) -> None:
-        self._set_pattern(self._led_bluetooth.get(), pattern)
+        self._set_pattern(self._led_bluetooth(), pattern)
 
     def turntable(self, pattern: EDrehbertLEDPattern) -> None:
-        self._set_pattern(self._led_scan.get(), pattern)
+        self._set_pattern(self._led_scan(), pattern)
 
     def error(self, pattern: EDrehbertLEDPattern) -> None:
-        self._set_pattern(self._led_error.get(), pattern)
+        self._set_pattern(self._led_error(), pattern)
 
     def _set_pattern(self, led: LED, pattern: EDrehbertLEDPattern) -> None:
         self._assert_open()

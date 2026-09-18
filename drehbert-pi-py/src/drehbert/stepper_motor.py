@@ -53,9 +53,9 @@ class StepperMotor(DrehbertContextManager):
         self._current_step = 0
 
     def _open(self) -> None:
-        self._motor_step.set(OutputDevice(GPIO_MOTOR_STEP, pin_factory=self._pin_factory))
-        self._motor_dir.set(OutputDevice(GPIO_MOTOR_DIR, pin_factory=self._pin_factory))
-        self._motor_enable.set(OutputDevice(
+        self._motor_step(OutputDevice(GPIO_MOTOR_STEP, pin_factory=self._pin_factory))
+        self._motor_dir(OutputDevice(GPIO_MOTOR_DIR, pin_factory=self._pin_factory))
+        self._motor_enable(OutputDevice(
             GPIO_MOTOR_ENABLE,
             initial_value=True,
             active_high=False,
@@ -66,16 +66,16 @@ class StepperMotor(DrehbertContextManager):
     def _close(self) -> None:
 
         # we have to disable the motor first before turning off and closing the pins
-        self._motor_enable.get().off()
+        self._motor_enable().off()
 
-        self._motor_step.get().off()
-        self._motor_step.get().close()
+        self._motor_step().off()
+        self._motor_step().close()
 
-        self._motor_dir.get().off()
-        self._motor_dir.get().close()
+        self._motor_dir().off()
+        self._motor_dir().close()
 
         # we have to close the motor enable pin last so it isn't enabled accidentally while cleaning up the other pins
-        self._motor_enable.get().close()
+        self._motor_enable().close()
 
     def set_current_position_as_zero(self) -> None:
         self._assert_open()
@@ -129,25 +129,25 @@ class StepperMotor(DrehbertContextManager):
 
     def _advance_one_step_in_current_direction(self) -> None:
         try:
-            self._motor_step.get().on()
+            self._motor_step().on()
             self._sleep(self._step_pulse_seconds)
-            self._motor_step.get().off()
+            self._motor_step().off()
 
             # The A4988 advances on the STEP pin's rising edge. Record the step before
             # waiting out the low part of the period.
-            if self._motor_dir.get().is_active:
+            if self._motor_dir().is_active:
                 self._current_step = (self._current_step + 1) % self._steps_per_revolution
             else:
                 self._current_step = (self._current_step - 1) % self._steps_per_revolution
 
             self._sleep(self._step_period_seconds - self._step_pulse_seconds)
         finally:
-            self._motor_step.get().off()
+            self._motor_step().off()
 
     def _set_dir(self, direction: StepperMotorDirection) -> None:
         requested_pin_state = direction is StepperMotorDirection.FORWARD
-        if self._motor_dir.get().is_active != requested_pin_state:
-            self._motor_dir.get().value = requested_pin_state
+        if self._motor_dir().is_active != requested_pin_state:
+            self._motor_dir().value = requested_pin_state
             self._sleep(self._set_dir_delay_seconds)
 
     @staticmethod

@@ -37,24 +37,24 @@ class DrehbertButtons(DrehbertContextManager):
     def _open(self) -> None:
 
         self.when_bluetooth_button_gesture: ButtonGestureHandler | None = None
-        self._bluetooth_button.set(Button(
+        self._bluetooth_button(Button(
             GPIO_BUTTON_BLUETOOTH,
             hold_time=self._long_press_threshold,
             pin_factory=self._pin_factory,
         ))
         self._register_gpiozero_button_gestures(
-            self._bluetooth_button.get(),
+            self._bluetooth_button(),
             lambda: self.when_bluetooth_button_gesture,
         )
 
         self.when_scan_button_gesture: ButtonGestureHandler | None = None
-        self._scan_button.set(Button(
+        self._scan_button(Button(
             GPIO_BUTTON_SCAN,
             hold_time=self._long_press_threshold,
             pin_factory=self._pin_factory,
         ))
         self._register_gpiozero_button_gestures(
-            self._scan_button.get(),
+            self._scan_button(),
             lambda: self.when_scan_button_gesture,
         )
 
@@ -62,10 +62,10 @@ class DrehbertButtons(DrehbertContextManager):
     def _close(self) -> None:
 
         self.when_bluetooth_button_gesture = None
-        self._bluetooth_button.get().close()
+        self._bluetooth_button().close()
 
         self.when_scan_button_gesture = None
-        self._scan_button.get().close()
+        self._scan_button().close()
 
     @staticmethod
     def _register_gpiozero_button_gestures(
