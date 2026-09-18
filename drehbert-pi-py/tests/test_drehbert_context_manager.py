@@ -15,19 +15,19 @@ def test_context_manager_enters_and_exits() -> None:
     manager = MockDrehbertContextManager()
     with manager as m:
         assert isinstance(m, MockDrehbertContextManager)
-        assert not m._closed
+        assert not m._state
     assert manager._close_count == 1
-    assert manager._closed
+    assert manager._state
 
 
 def test_context_manager_close_called_twice() -> None:
     manager = MockDrehbertContextManager()
     manager.close()
     assert manager._close_count == 1
-    assert manager._closed
+    assert manager._state
     manager.close()  # Call close again; it should not raise an error or double-close
     assert manager._close_count == 1
-    assert manager._closed
+    assert manager._state
 
 
 def test_context_manager_close_called_in_with() -> None:
@@ -35,12 +35,12 @@ def test_context_manager_close_called_in_with() -> None:
     with manager as m:
         m.close()
         assert m._close_count == 1
-        assert m._closed
+        assert m._state
     assert manager._close_count == 1
-    assert manager._closed
+    assert manager._state
     manager.close()
     assert manager._close_count == 1
-    assert manager._closed
+    assert manager._state
 
 
 def test_context_manager_raises_when_already_closed() -> None:

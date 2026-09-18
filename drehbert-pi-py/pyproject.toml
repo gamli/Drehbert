@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "Controller for the Drehbert photogrammetry turntable"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "gpiozero>=2.0.1.post3,<3",
-    "lgpio>=0.2.2.0,<0.3; sys_platform == 'linux' and platform_machine == 'armv6l'",
+    "dbus-next==0.2.*",
+    "gpiozero==2.0.*",
+    "lgpio==0.2.*; sys_platform == 'linux' and platform_machine == 'armv6l'",
 ]
 
 [project.scripts]
@@ -17,8 +18,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1,<10",
-    "ruff>=0.16.7,<0.17",
+    "pytest==9.*",
+    "ruff==0.16.*",
 ]
 
 [tool.pytest.ini_options]

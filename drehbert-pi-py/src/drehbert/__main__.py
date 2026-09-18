@@ -1,3 +1,5 @@
-﻿from drehbert.app import main
+﻿import asyncio
 
-raise SystemExit(main())
+from drehbert.app import main
+
+raise SystemExit(asyncio.run(main()))
