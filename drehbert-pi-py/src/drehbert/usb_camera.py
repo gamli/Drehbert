@@ -47,9 +47,8 @@ class UsbCamera(DrehbertAsyncContextManager):
         self.when_ready_changed: CameraReadyChangedHandler | None = None
 
         self._hid_fd = OptionalValue[int]("_hid_fd")
-        self._ready_event = OptionalValue[asyncio.Event]("_ready_event")
         self._capture_lock = OptionalValue[asyncio.Lock]("_capture_lock")
-        self._ready_monitor = OptionalValue[asyncio.Task[None]]("_ready_monitor")
+        self._ready_polling_task = OptionalValue[asyncio.Task[None]]("_ready_polling_task")
         self._ready = False
 
     @property
@@ -70,24 +69,23 @@ class UsbCamera(DrehbertAsyncContextManager):
             ) from error
 
         self._hid_fd(hid_fd)
-        self._ready_event(asyncio.Event())
         self._capture_lock(asyncio.Lock())
         self._set_ready(self._read_ready(), force_notification=True)
-        self._ready_monitor(
+        self._ready_polling_task(
             asyncio.create_task(
-                self._monitor_ready(),
-                name="usb-camera-ready-monitor",
+                self._poll_ready_state(),
+                name="usb-camera-ready-state-polling",
             )
         )
 
     @override
     async def _close(self) -> None:
-        if self._ready_monitor.is_set():
-            monitor = self._ready_monitor()
-            monitor.cancel()
+        if self._ready_polling_task.is_set():
+            polling_task = self._ready_polling_task()
+            polling_task.cancel()
             with suppress(asyncio.CancelledError):
-                await monitor
-            self._ready_monitor.reset()
+                await polling_task
+            self._ready_polling_task.reset()
 
         if self._hid_fd.is_set():
             with suppress(OSError):
@@ -96,12 +94,7 @@ class UsbCamera(DrehbertAsyncContextManager):
             self._hid_fd.reset()
 
         self._set_ready(False)
-        self._ready_event.reset()
         self._capture_lock.reset()
-
-    async def wait_until_ready(self) -> None:
-        self._assert_open()
-        await self._ready_event().wait()
 
     async def capture_photo(self) -> None:
         self._assert_open()
@@ -128,7 +121,7 @@ class UsbCamera(DrehbertAsyncContextManager):
                     with suppress(OSError):
                         self._write_report(self._RELEASE_REPORT)
 
-    async def _monitor_ready(self) -> None:
+    async def _poll_ready_state(self) -> None:
         while True:
             self._set_ready(self._read_ready())
             await asyncio.sleep(self._ready_poll_seconds)
@@ -149,12 +142,6 @@ class UsbCamera(DrehbertAsyncContextManager):
             return
 
         self._ready = ready
-        if self._ready_event.is_set():
-            if ready:
-                self._ready_event().set()
-            else:
-                self._ready_event().clear()
-
         if self.when_ready_changed is not None:
             try:
                 self.when_ready_changed(ready)

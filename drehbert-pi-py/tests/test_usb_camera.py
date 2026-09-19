@@ -48,16 +48,23 @@ def test_capture_sends_volume_down_press_and_release(tmp_path: Path) -> None:
     asyncio.run(run())
 
 
-def test_ready_event_tracks_udc_configuration(tmp_path: Path) -> None:
+def test_ready_callback_tracks_udc_configuration(tmp_path: Path) -> None:
     async def run() -> None:
         camera, state_path = create_camera(tmp_path, "not attached")
         ready_changes: list[bool] = []
-        camera.when_ready_changed = ready_changes.append
+        became_ready = asyncio.Event()
+
+        def ready_changed(ready: bool) -> None:
+            ready_changes.append(ready)
+            if ready:
+                became_ready.set()
+
+        camera.when_ready_changed = ready_changed
 
         async with camera:
             assert not camera.is_ready
             state_path.write_text("configured", encoding="ascii")
-            await asyncio.wait_for(camera.wait_until_ready(), timeout=1)
+            await asyncio.wait_for(became_ready.wait(), timeout=1)
             assert camera.is_ready
 
         assert ready_changes == [False, True, False]

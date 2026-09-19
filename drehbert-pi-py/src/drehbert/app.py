@@ -17,8 +17,7 @@ async def main() -> int:
             ready,
         )
         async with camera:
-            await camera.wait_until_ready()
-            LOGGER.info("USB camera remote is ready")
+            LOGGER.info("USB camera remote initialized; ready: %s", camera.is_ready)
 
             # LED and controller integration follows in DrehbertController.
 
