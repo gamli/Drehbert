@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-for group in gpio bluetooth; do
+for group in gpio; do
   getent group "${group}" >/dev/null || groupadd --system "${group}"
 done
 
@@ -15,7 +15,7 @@ if ! id drehbert >/dev/null 2>&1; then
 fi
 
 passwd --lock drehbert
-usermod --append --groups gpio,bluetooth drehbert
+usermod --append --groups gpio drehbert
 install --directory --owner drehbert --group drehbert --mode 0750 \
   /opt/drehbert \
   /var/lib/drehbert

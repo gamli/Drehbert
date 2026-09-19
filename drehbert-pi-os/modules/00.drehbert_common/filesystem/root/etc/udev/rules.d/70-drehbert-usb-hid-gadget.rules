@@ -1,0 +1,1 @@
+SUBSYSTEM=="hidg", KERNEL=="hidg0", GROUP="drehbert", MODE="0660"

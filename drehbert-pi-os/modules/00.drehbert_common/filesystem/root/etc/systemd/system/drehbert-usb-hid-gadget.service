@@ -1,0 +1,14 @@
+[Unit]
+Description=Drehbert USB HID camera remote
+Requires=sys-kernel-config.mount
+After=systemd-modules-load.service sys-kernel-config.mount
+Before=drehbert.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/drehbert-usb-hid-gadget start
+ExecStop=/usr/local/sbin/drehbert-usb-hid-gadget stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
