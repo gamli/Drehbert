@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly gadget_name=drehbert
+readonly gadget_dir="/sys/kernel/config/usb_gadget/${gadget_name}"
+
+stop_gadget() {
+  [[ -d "${gadget_dir}" ]] || return 0
+
+  if [[ -f "${gadget_dir}/UDC" ]]; then
+    printf '' > "${gadget_dir}/UDC"
+  fi
+
+  rm -f "${gadget_dir}/configs/c.1/hid.usb0"
+  for directory in \
+      "${gadget_dir}/configs/c.1/strings/0x409" \
+      "${gadget_dir}/configs/c.1" \
+      "${gadget_dir}/functions/hid.usb0" \
+      "${gadget_dir}/strings/0x409" \
+      "${gadget_dir}"; do
+    [[ ! -d "${directory}" ]] || rmdir "${directory}"
+  done
+}
+
+start_gadget() {
+  modprobe libcomposite
+
+  if [[ -d "${gadget_dir}" ]]; then
+    stop_gadget
+  fi
+
+  mkdir "${gadget_dir}"
+  cd "${gadget_dir}"
+
+  # Linux Foundation VID/PID used by the kernel's ConfigFS gadget examples.
+  printf '0x1d6b' > idVendor
+  printf '0x0104' > idProduct
+  printf '0x0200' > bcdUSB
+  printf '0x0100' > bcdDevice
+
+  mkdir -p strings/0x409
+  serial_number="$(sed -n 's/^Serial[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n 1)"
+  printf '%s' "${serial_number:-0000000000000000}" > strings/0x409/serialnumber
+  printf 'Drehbert' > strings/0x409/manufacturer
+  printf 'Drehbert Camera Remote' > strings/0x409/product
+
+  mkdir -p configs/c.1/strings/0x409
+  printf 'HID Camera Remote' > configs/c.1/strings/0x409/configuration
+  printf '0xC0' > configs/c.1/bmAttributes
+  printf '2' > configs/c.1/MaxPower
+
+  mkdir functions/hid.usb0
+  printf '0' > functions/hid.usb0/protocol
+  printf '0' > functions/hid.usb0/subclass
+  printf '1' > functions/hid.usb0/report_length
+
+  # Consumer Control with one Volume Decrement bit and seven padding bits.
+  printf '\x05\x0c\x09\x01\xa1\x01\x15\x00\x25\x01\x09\xea\x75\x01\x95\x01\x81\x02\x75\x07\x95\x01\x81\x03\xc0' \
+    > functions/hid.usb0/report_desc
+
+  ln -s functions/hid.usb0 configs/c.1/hid.usb0
+
+  udc=''
+  for _ in {1..50}; do
+    udc="$(find /sys/class/udc -mindepth 1 -maxdepth 1 -printf '%f\n' | head -n 1)"
+    [[ -n "${udc}" ]] && break
+    sleep 0.1
+  done
+  [[ -n "${udc}" ]] || {
+    echo 'No USB device controller is available.' >&2
+    return 1
+  }
+
+  printf '%s' "${udc}" > UDC
+  udevadm settle --timeout=5
+}
+
+case "${1:-}" in
+  start)
+    start_gadget
+    ;;
+  stop)
+    stop_gadget
+    ;;
+  *)
+    echo "Usage: ${0##*/} start|stop" >&2
+    exit 2
+    ;;
+esac

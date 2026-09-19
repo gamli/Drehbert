@@ -57,7 +57,7 @@ boot_config=/boot/firmware/config.txt
 if [[ -f "${boot_config}" ]]; then
   {
     printf '\n[all]\n'
-    printf '# Drehbert PROD: headless, Bluetooth stays enabled.\n'
+    printf '# Drehbert PROD: headless.\n'
     printf 'dtoverlay=disable-wifi\n'
     printf 'disable_splash=1\n'
     printf 'dtparam=audio=off\n'
@@ -72,5 +72,4 @@ if [[ -f "${boot_cmdline}" ]]; then
 fi
 
 systemctl set-default multi-user.target
-systemctl enable bluetooth.service
 systemctl enable drehbert.service
