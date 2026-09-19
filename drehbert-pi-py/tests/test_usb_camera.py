@@ -102,6 +102,14 @@ def test_open_error_is_not_translated(tmp_path: Path) -> None:
     asyncio.run(run())
 
 
+def test_ready_state_read_error_is_not_translated(tmp_path: Path) -> None:
+    camera, state_path = create_camera(tmp_path)
+    state_path.unlink()
+
+    with pytest.raises(FileNotFoundError):
+        camera._read_ready()
+
+
 def test_disconnect_race_is_reported_as_camera_disconnected(tmp_path: Path) -> None:
     async def run() -> None:
         camera, _ = create_camera(tmp_path)
@@ -115,6 +123,39 @@ def test_disconnect_race_is_reported_as_camera_disconnected(tmp_path: Path) -> N
                 pytest.raises(CameraDisconnectedError, match="disconnected"),
             ):
                 await camera.capture_photo()
+
+    asyncio.run(run())
+
+
+def test_disconnect_during_close_is_ignored(tmp_path: Path) -> None:
+    async def run() -> None:
+        camera, _ = create_camera(tmp_path)
+
+        with patch(
+            "drehbert.usb_camera.os.write",
+            side_effect=OSError(errno.ESHUTDOWN, "USB disconnected"),
+        ):
+            async with camera:
+                pass
+
+    asyncio.run(run())
+
+
+def test_unexpected_close_error_is_not_ignored(tmp_path: Path) -> None:
+    async def run() -> None:
+        camera, _ = create_camera(tmp_path)
+
+        with (
+            patch(
+                "drehbert.usb_camera.os.write",
+                side_effect=OSError(errno.EIO, "I/O error"),
+            ),
+            pytest.raises(OSError) as error,
+        ):
+            async with camera:
+                pass
+
+        assert error.value.errno == errno.EIO
 
     asyncio.run(run())
 

@@ -82,8 +82,12 @@ class UsbCamera(DrehbertAsyncContextManager):
             self._ready_polling_task.reset()
 
         if self._hid_fd.is_set():
-            with suppress(OSError):
+            try:
                 self._write_report(self._RELEASE_REPORT)
+            except OSError as error:
+                if error.errno != errno.ESHUTDOWN:
+                    raise
+
             os.close(self._hid_fd())
             self._hid_fd.reset()
 
@@ -108,8 +112,11 @@ class UsbCamera(DrehbertAsyncContextManager):
             ) from error
         finally:
             if pressed:
-                with suppress(OSError):
+                try:
                     self._write_report(self._RELEASE_REPORT)
+                except OSError as error:
+                    if error.errno != errno.ESHUTDOWN:
+                        raise
 
     async def _poll_ready_state(self) -> None:
         while True:
@@ -122,17 +129,17 @@ class UsbCamera(DrehbertAsyncContextManager):
             await asyncio.sleep(self._ready_poll_seconds)
 
     def _read_ready(self) -> bool:
-        try:
-            udc_name = self._gadget_udc_path.read_text(encoding="ascii").strip()
-            if not udc_name:
-                return False
-
-            state_path = self._udc_class_path / udc_name / "state"
-            return state_path.read_text(encoding="ascii").strip() == "configured"
-        except OSError:
+        udc_name = self._gadget_udc_path.read_text(encoding="ascii").strip()
+        if not udc_name:
             return False
+
+        state_path = self._udc_class_path / udc_name / "state"
+        return state_path.read_text(encoding="ascii").strip() == "configured"
 
     def _write_report(self, report: bytes) -> None:
         written = os.write(self._hid_fd(), report)
         if written != len(report):
-            raise OSError(f"Incomplete HID report: wrote {written} of {len(report)} bytes")
+            raise OSError(
+                errno.EIO,
+                f"Incomplete HID report: wrote {written} of {len(report)} bytes",
+            )
