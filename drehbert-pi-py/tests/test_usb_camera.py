@@ -67,23 +67,20 @@ def test_ready_callback_tracks_udc_configuration(tmp_path: Path) -> None:
             await asyncio.wait_for(became_ready.wait(), timeout=1)
             assert camera.is_ready
 
-        assert ready_changes == [False, True, False]
+        assert ready_changes == [False, True]
 
     asyncio.run(run())
 
 
-def test_capture_rechecks_state_before_writing(tmp_path: Path) -> None:
+def test_capture_does_not_depend_on_cached_ready_state(tmp_path: Path) -> None:
     async def run() -> None:
-        camera, state_path = create_camera(tmp_path)
+        camera, _ = create_camera(tmp_path, "not attached")
 
         async with camera:
-            assert camera.is_ready
-            state_path.write_text("not attached", encoding="ascii")
-
-            with pytest.raises(CameraUnavailableError, match="not ready"):
-                await camera.capture_photo()
-
             assert not camera.is_ready
+            await camera.capture_photo()
+
+        assert (tmp_path / "hidg0").read_bytes() == b"\x01\x00\x00"
 
     asyncio.run(run())
 
@@ -91,8 +88,6 @@ def test_capture_rechecks_state_before_writing(tmp_path: Path) -> None:
 def test_disconnect_race_is_reported_as_camera_unavailable(tmp_path: Path) -> None:
     async def run() -> None:
         camera, _ = create_camera(tmp_path)
-        ready_changes: list[bool] = []
-        camera.when_ready_changed = ready_changes.append
 
         async with camera:
             with (
@@ -103,8 +98,5 @@ def test_disconnect_race_is_reported_as_camera_unavailable(tmp_path: Path) -> No
                 pytest.raises(CameraUnavailableError, match="disconnected"),
             ):
                 await camera.capture_photo()
-
-            assert not camera.is_ready
-            assert ready_changes[-1] is False
 
     asyncio.run(run())

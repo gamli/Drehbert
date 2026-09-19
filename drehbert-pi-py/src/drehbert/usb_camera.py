@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 from collections.abc import Callable
 from contextlib import suppress
@@ -8,8 +7,6 @@ from typing import Final, override
 
 from drehbert.drehbert_context_manager import DrehbertAsyncContextManager
 from drehbert.optional_value import OptionalValue
-
-LOGGER = logging.getLogger(__name__)
 
 type CameraReadyChangedHandler = Callable[[bool], None]
 
@@ -47,14 +44,13 @@ class UsbCamera(DrehbertAsyncContextManager):
         self.when_ready_changed: CameraReadyChangedHandler | None = None
 
         self._hid_fd = OptionalValue[int]("_hid_fd")
-        self._capture_lock = OptionalValue[asyncio.Lock]("_capture_lock")
         self._ready_polling_task = OptionalValue[asyncio.Task[None]]("_ready_polling_task")
-        self._ready = False
+        self._is_ready = False
 
     @property
     def is_ready(self) -> bool:
         self._assert_open()
-        return self._ready
+        return self._is_ready
 
     @override
     async def _open(self) -> None:
@@ -69,8 +65,10 @@ class UsbCamera(DrehbertAsyncContextManager):
             ) from error
 
         self._hid_fd(hid_fd)
-        self._capture_lock(asyncio.Lock())
-        self._set_ready(self._read_ready(), force_notification=True)
+        self._is_ready = self._read_ready()
+        if self.when_ready_changed is not None:
+            self.when_ready_changed(self._is_ready)
+
         self._ready_polling_task(
             asyncio.create_task(
                 self._poll_ready_state(),
@@ -93,37 +91,35 @@ class UsbCamera(DrehbertAsyncContextManager):
             os.close(self._hid_fd())
             self._hid_fd.reset()
 
-        self._set_ready(False)
-        self._capture_lock.reset()
+        self._is_ready = False
 
     async def capture_photo(self) -> None:
         self._assert_open()
 
-        async with self._capture_lock():
-            self._set_ready(self._read_ready())
-            if not self._ready:
-                raise CameraUnavailableError("USB camera remote is not ready")
-
+        pressed = False
+        try:
+            self._write_report(self._PRESS_REPORT)
+            pressed = True
+            await asyncio.sleep(self._key_press_seconds)
+            self._write_report(self._RELEASE_REPORT)
             pressed = False
-            try:
-                self._write_report(self._PRESS_REPORT)
-                pressed = True
-                await asyncio.sleep(self._key_press_seconds)
-                self._write_report(self._RELEASE_REPORT)
-                pressed = False
-            except OSError as error:
-                self._set_ready(False)
-                raise CameraUnavailableError(
-                    "USB camera remote disconnected while capturing",
-                ) from error
-            finally:
-                if pressed:
-                    with suppress(OSError):
-                        self._write_report(self._RELEASE_REPORT)
+        except OSError as error:
+            raise CameraUnavailableError(
+                "USB camera remote disconnected while capturing",
+            ) from error
+        finally:
+            if pressed:
+                with suppress(OSError):
+                    self._write_report(self._RELEASE_REPORT)
 
     async def _poll_ready_state(self) -> None:
         while True:
-            self._set_ready(self._read_ready())
+            is_ready = self._read_ready()
+            if is_ready != self._is_ready:
+                self._is_ready = is_ready
+                if self.when_ready_changed is not None:
+                    self.when_ready_changed(is_ready)
+
             await asyncio.sleep(self._ready_poll_seconds)
 
     def _read_ready(self) -> bool:
@@ -136,17 +132,6 @@ class UsbCamera(DrehbertAsyncContextManager):
             return state_path.read_text(encoding="ascii").strip() == "configured"
         except OSError:
             return False
-
-    def _set_ready(self, ready: bool, *, force_notification: bool = False) -> None:
-        if ready == self._ready and not force_notification:
-            return
-
-        self._ready = ready
-        if self.when_ready_changed is not None:
-            try:
-                self.when_ready_changed(ready)
-            except Exception:
-                LOGGER.exception("USB camera ready-state handler failed")
 
     def _write_report(self, report: bytes) -> None:
         written = os.write(self._hid_fd(), report)
