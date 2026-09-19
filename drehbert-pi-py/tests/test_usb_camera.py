@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from drehbert.usb_camera import CameraUnavailableError, UsbCamera
+from drehbert.usb_camera import CameraDisconnectedError, UsbCamera
 
 
 def create_camera_files(tmp_path: Path, state: str) -> tuple[Path, Path, Path]:
@@ -85,7 +85,24 @@ def test_capture_does_not_depend_on_cached_ready_state(tmp_path: Path) -> None:
     asyncio.run(run())
 
 
-def test_disconnect_race_is_reported_as_camera_unavailable(tmp_path: Path) -> None:
+def test_open_error_is_not_translated(tmp_path: Path) -> None:
+    async def run() -> None:
+        camera, _ = create_camera(tmp_path)
+
+        with (
+            patch(
+                "drehbert.usb_camera.os.open",
+                side_effect=PermissionError(errno.EACCES, "Permission denied"),
+            ),
+            pytest.raises(PermissionError),
+        ):
+            async with camera:
+                pass
+
+    asyncio.run(run())
+
+
+def test_disconnect_race_is_reported_as_camera_disconnected(tmp_path: Path) -> None:
     async def run() -> None:
         camera, _ = create_camera(tmp_path)
 
@@ -95,8 +112,27 @@ def test_disconnect_race_is_reported_as_camera_unavailable(tmp_path: Path) -> No
                     "drehbert.usb_camera.os.write",
                     side_effect=OSError(errno.ESHUTDOWN, "USB disconnected"),
                 ),
-                pytest.raises(CameraUnavailableError, match="disconnected"),
+                pytest.raises(CameraDisconnectedError, match="disconnected"),
             ):
                 await camera.capture_photo()
+
+    asyncio.run(run())
+
+
+def test_unexpected_write_error_is_not_translated(tmp_path: Path) -> None:
+    async def run() -> None:
+        camera, _ = create_camera(tmp_path)
+
+        async with camera:
+            with (
+                patch(
+                    "drehbert.usb_camera.os.write",
+                    side_effect=OSError(errno.EIO, "I/O error"),
+                ),
+                pytest.raises(OSError) as error,
+            ):
+                await camera.capture_photo()
+
+            assert error.value.errno == errno.EIO
 
     asyncio.run(run())

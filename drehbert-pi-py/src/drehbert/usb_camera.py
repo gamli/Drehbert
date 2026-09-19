@@ -1,4 +1,5 @@
 import asyncio
+import errno
 import os
 from collections.abc import Callable
 from contextlib import suppress
@@ -11,7 +12,7 @@ from drehbert.optional_value import OptionalValue
 type CameraReadyChangedHandler = Callable[[bool], None]
 
 
-class CameraUnavailableError(RuntimeError):
+class CameraDisconnectedError(RuntimeError):
     pass
 
 
@@ -54,15 +55,10 @@ class UsbCamera(DrehbertAsyncContextManager):
 
     @override
     async def _open(self) -> None:
-        try:
-            hid_fd = os.open(
-                self._hid_device_path,
-                os.O_WRONLY | os.O_NONBLOCK | os.O_CLOEXEC,
-            )
-        except OSError as error:
-            raise CameraUnavailableError(
-                f"Cannot open USB HID device {self._hid_device_path}",
-            ) from error
+        hid_fd = os.open(
+            self._hid_device_path,
+            os.O_WRONLY | os.O_NONBLOCK | os.O_CLOEXEC,
+        )
 
         self._hid_fd(hid_fd)
         self._is_ready = self._read_ready()
@@ -104,7 +100,10 @@ class UsbCamera(DrehbertAsyncContextManager):
             self._write_report(self._RELEASE_REPORT)
             pressed = False
         except OSError as error:
-            raise CameraUnavailableError(
+            if error.errno != errno.ESHUTDOWN:
+                raise
+
+            raise CameraDisconnectedError(
                 "USB camera remote disconnected while capturing",
             ) from error
         finally:
