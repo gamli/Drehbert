@@ -1,4 +1,4 @@
-from typing import Final
+﻿from typing import Final
 
 from drehbert.drehbert_buttons import DrehbertButtons
 from drehbert.drehbert_leds import DrehbertLEDs
@@ -8,11 +8,11 @@ from drehbert.usb_camera import UsbCamera
 
 class DrehbertController:
     def __init__(
-        self,
-        drehbert_buttons: DrehbertButtons,
-        stepper_motor: StepperMotor,
-        drehbert_leds: DrehbertLEDs,
-        camera: UsbCamera,
+            self,
+            drehbert_buttons: DrehbertButtons,
+            stepper_motor: StepperMotor,
+            drehbert_leds: DrehbertLEDs,
+            camera: UsbCamera,
     ):
         self._drehbert_buttons: Final[DrehbertButtons] = drehbert_buttons
         self._stepper_motor: Final[StepperMotor] = stepper_motor

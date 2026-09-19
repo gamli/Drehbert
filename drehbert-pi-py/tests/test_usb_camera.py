@@ -132,8 +132,8 @@ def test_disconnect_during_close_is_ignored(tmp_path: Path) -> None:
         camera, _ = create_camera(tmp_path)
 
         with patch(
-            "drehbert.usb_camera.os.write",
-            side_effect=OSError(errno.ESHUTDOWN, "USB disconnected"),
+                "drehbert.usb_camera.os.write",
+                side_effect=OSError(errno.ESHUTDOWN, "USB disconnected"),
         ):
             async with camera:
                 pass

@@ -1,10 +1,15 @@
 import pytest
+
 from drehbert.drehbert_context_manager import DrehbertContextManager
 
 
 class MockDrehbertContextManager(DrehbertContextManager):
+
     def __init__(self):
         super().__init__()
+        self._close_count = 0
+
+    def _open(self) -> None:
         self._close_count = 0
 
     def _close(self) -> None:

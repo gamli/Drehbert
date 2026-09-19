@@ -21,13 +21,13 @@ class UsbCamera(DrehbertAsyncContextManager):
     _RELEASE_REPORT: Final = b"\x00"
 
     def __init__(
-        self,
-        *,
-        hid_device_path: Path = Path("/dev/hidg0"),
-        gadget_udc_path: Path = Path("/sys/kernel/config/usb_gadget/drehbert/UDC"),
-        udc_class_path: Path = Path("/sys/class/udc"),
-        key_press_seconds: float = 0.05,
-        ready_poll_seconds: float = 0.1,
+            self,
+            *,
+            hid_device_path: Path = Path("/dev/hidg0"),
+            gadget_udc_path: Path = Path("/sys/kernel/config/usb_gadget/drehbert/UDC"),
+            udc_class_path: Path = Path("/sys/class/udc"),
+            key_press_seconds: float = 0.05,
+            ready_poll_seconds: float = 0.1,
     ) -> None:
         super().__init__()
 
