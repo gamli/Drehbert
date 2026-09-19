@@ -51,7 +51,7 @@ rm -f "${uv_archive}"
 rm -rf "${uv_directory}"
 trap - EXIT
 
-for group in sudo adm dialout gpio bluetooth; do
+for group in sudo adm dialout gpio; do
   if getent group "${group}" >/dev/null; then
     usermod --append --groups "${group}" drehbert
   fi
