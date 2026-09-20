@@ -11,7 +11,7 @@ from drehbert.gpio_constants import GPIO_MOTOR_DIR, GPIO_MOTOR_ENABLE, GPIO_MOTO
 from drehbert.optional_value import OptionalValue
 
 
-class StepperMotorDirection(StrEnum):
+class EStepperMotorDirection(StrEnum):
     FORWARD = "forward"
     REVERSE = "reverse"
 
@@ -84,7 +84,7 @@ class StepperMotor(DrehbertContextManager):
     def rotate_to_degrees(
             self,
             degrees: float,
-            direction: StepperMotorDirection,
+            direction: EStepperMotorDirection,
     ) -> None:
         self._assert_open()
         self._require_direction(direction)
@@ -96,7 +96,7 @@ class StepperMotor(DrehbertContextManager):
             degrees * self._steps_per_revolution / 360.0
         ) % self._steps_per_revolution
 
-        if direction is StepperMotorDirection.FORWARD:
+        if direction is EStepperMotorDirection.FORWARD:
             step_count = (
                                  target_step - self._current_step
                          ) % self._steps_per_revolution
@@ -107,10 +107,11 @@ class StepperMotor(DrehbertContextManager):
 
         self.rotate_steps(step_count, direction)
 
-    def rotate_one_revolution(self, direction: StepperMotorDirection) -> None:
+    def rotate_one_revolution(self, direction: EStepperMotorDirection) -> None:
         self.rotate_steps(self._steps_per_revolution, direction)
 
-    def rotate_steps(self, step_count: int, direction: StepperMotorDirection) -> None:
+    def rotate_steps(self, step_count: int, direction: EStepperMotorDirection) -> None:
+
         self._assert_open()
         self._require_direction(direction)
         self._require_int("step_count", step_count)
@@ -144,21 +145,21 @@ class StepperMotor(DrehbertContextManager):
         finally:
             self._motor_step().off()
 
-    def _set_dir(self, direction: StepperMotorDirection) -> None:
-        requested_pin_state = direction is StepperMotorDirection.FORWARD
+    def _set_dir(self, direction: EStepperMotorDirection) -> None:
+        requested_pin_state = direction is EStepperMotorDirection.FORWARD
         if self._motor_dir().is_active != requested_pin_state:
             self._motor_dir().value = requested_pin_state
             self._sleep(self._set_dir_delay_seconds)
 
     @staticmethod
-    def _reverse_direction(direction: StepperMotorDirection) -> StepperMotorDirection:
-        if direction is StepperMotorDirection.FORWARD:
-            return StepperMotorDirection.REVERSE
-        return StepperMotorDirection.FORWARD
+    def _reverse_direction(direction: EStepperMotorDirection) -> EStepperMotorDirection:
+        if direction is EStepperMotorDirection.FORWARD:
+            return EStepperMotorDirection.REVERSE
+        return EStepperMotorDirection.FORWARD
 
     @staticmethod
-    def _require_direction(direction: StepperMotorDirection) -> None:
-        if not isinstance(direction, StepperMotorDirection):
+    def _require_direction(direction: EStepperMotorDirection) -> None:
+        if not isinstance(direction, EStepperMotorDirection):
             raise TypeError("direction must be a StepperMotorDirection")
 
     @classmethod

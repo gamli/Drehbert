@@ -1,7 +1,7 @@
 import pytest
 from gpiozero.pins.mock import MockFactory
 
-from drehbert.stepper_motor import StepperMotor, StepperMotorDirection
+from drehbert.stepper_motor import StepperMotor, EStepperMotorDirection
 
 
 @pytest.fixture
@@ -28,10 +28,10 @@ def make_motor(
 def test_rotate_to_degrees_wraps_forward(pin_factory: MockFactory) -> None:
     motor = make_motor(pin_factory)
 
-    motor.rotate_to_degrees(270, StepperMotorDirection.FORWARD)
+    motor.rotate_to_degrees(270, EStepperMotorDirection.FORWARD)
     assert motor._current_step == 3
 
-    motor.rotate_to_degrees(360, StepperMotorDirection.FORWARD)
+    motor.rotate_to_degrees(360, EStepperMotorDirection.FORWARD)
     assert motor._current_step == 0
 
     motor.close()
@@ -40,7 +40,7 @@ def test_rotate_to_degrees_wraps_forward(pin_factory: MockFactory) -> None:
 def test_rotate_to_degrees_wraps_reverse(pin_factory: MockFactory) -> None:
     motor = make_motor(pin_factory)
 
-    motor.rotate_to_degrees(270, StepperMotorDirection.REVERSE)
+    motor.rotate_to_degrees(270, EStepperMotorDirection.REVERSE)
 
     assert motor._current_step == 3
     motor.close()
@@ -52,7 +52,7 @@ def test_step_uses_short_high_pulse_and_remaining_period(
     sleep_calls: list[float] = []
     motor = make_motor(pin_factory, sleep_calls)
 
-    motor.rotate_steps(1, StepperMotorDirection.REVERSE)
+    motor.rotate_steps(1, EStepperMotorDirection.REVERSE)
 
     assert sleep_calls == pytest.approx([0.001, 0.009])
     motor.close()
@@ -96,7 +96,7 @@ def test_step_count_must_be_an_integer(
     with pytest.raises(TypeError, match="step_count must be an integer"):
         motor.rotate_steps(  # type: ignore[arg-type]
             step_count,
-            StepperMotorDirection.FORWARD,
+            EStepperMotorDirection.FORWARD,
         )
 
     motor.close()

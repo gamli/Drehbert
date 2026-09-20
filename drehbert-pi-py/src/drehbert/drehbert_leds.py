@@ -27,10 +27,10 @@ class DrehbertLEDs(DrehbertContextManager):
         self._led_error = OptionalValue[LED]("_led_error")
 
     def _open(self) -> None:
-        self._led_general: OptionalValue[LED] = LED(GPIO_LED_GENERAL, pin_factory=self._pin_factory)
-        self._led_bluetooth: OptionalValue[LED] = LED(GPIO_LED_BLUETOOTH, pin_factory=self._pin_factory)
-        self._led_scan: OptionalValue[LED] = LED(GPIO_LED_TURNTABLE, pin_factory=self._pin_factory)
-        self._led_error: OptionalValue[LED] = LED(GPIO_LED_ERROR, pin_factory=self._pin_factory)
+        self._led_general(LED(GPIO_LED_GENERAL, pin_factory=self._pin_factory))
+        self._led_bluetooth(LED(GPIO_LED_BLUETOOTH, pin_factory=self._pin_factory))
+        self._led_scan(LED(GPIO_LED_TURNTABLE, pin_factory=self._pin_factory))
+        self._led_error(LED(GPIO_LED_ERROR, pin_factory=self._pin_factory))
 
     @override
     def _close(self) -> None:
