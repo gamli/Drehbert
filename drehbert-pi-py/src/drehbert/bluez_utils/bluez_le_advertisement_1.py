@@ -3,7 +3,7 @@
 from dbus_next import PropertyAccess
 from dbus_next.service import ServiceInterface, method, dbus_property
 
-from ..dbus_utils import DBUS_STRING, DBUS_STRING_ARRAY, DBUS_UINT16
+from ..dbus_utils.dbus_types import DBUS_STRING, DBUS_STRING_ARRAY, DBUS_UINT16
 
 type BluezAdvertisedType = Literal["peripheral", "broadcast"]
 

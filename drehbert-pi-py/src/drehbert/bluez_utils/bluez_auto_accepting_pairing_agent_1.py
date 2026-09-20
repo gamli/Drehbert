@@ -1,6 +1,6 @@
 ﻿from dbus_next.service import ServiceInterface, method
 
-from ..dbus_utils import DBUS_OBJECT_PATH, DBUS_UINT32, DBUS_STRING
+from ..dbus_utils.dbus_types import DBUS_OBJECT_PATH, DBUS_UINT32, DBUS_STRING
 
 
 # noinspection PyPep8Naming

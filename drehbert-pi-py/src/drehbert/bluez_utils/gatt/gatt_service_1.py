@@ -1,7 +1,7 @@
 ﻿from dbus_next import PropertyAccess
 from dbus_next.service import ServiceInterface, dbus_property
 
-from drehbert.dbus_utils import DBUS_STRING, DBUS_BOOLEAN
+from drehbert.dbus_utils.dbus_types import DBUS_STRING, DBUS_BOOLEAN
 
 
 # noinspection PyPep8Naming

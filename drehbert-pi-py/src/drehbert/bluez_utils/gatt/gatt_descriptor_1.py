@@ -1,7 +1,8 @@
 ﻿from dbus_next import PropertyAccess
 from dbus_next.service import ServiceInterface, dbus_property, method
 
-from drehbert.dbus_utils import DBUS_STRING, DBUS_OBJECT_PATH, DBUS_BYTE_ARRAY, DBUS_STRING_ARRAY, DBUS_OPTIONS
+from drehbert.dbus_utils.dbus_types import DBUS_STRING, DBUS_OBJECT_PATH, DBUS_BYTE_ARRAY, DBUS_STRING_ARRAY, \
+    DBUS_OPTIONS
 from ..binary_utils import read_at_offset
 
 
