@@ -5,7 +5,7 @@ from drehbert.dbus_utils import DBUS_STRING, DBUS_BOOLEAN
 
 
 # noinspection PyPep8Naming
-class BluezGattService(ServiceInterface):
+class BluezGattService1(ServiceInterface):
 
     def __init__(self, uuid: str) -> None:
         super().__init__("org.bluez.GattService1")

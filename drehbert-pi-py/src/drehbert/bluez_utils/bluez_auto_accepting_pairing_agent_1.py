@@ -4,7 +4,7 @@ from ..dbus_utils import DBUS_OBJECT_PATH, DBUS_UINT32, DBUS_STRING
 
 
 # noinspection PyPep8Naming
-class BlueZAutoAcceptingPairingAgent(ServiceInterface):
+class BlueZAutoAcceptingPairingAgent1(ServiceInterface):
 
     def __init__(self) -> None:
         super().__init__("org.bluez.Agent1")

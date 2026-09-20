@@ -6,7 +6,7 @@ from ..binary_utils import read_at_offset
 
 
 # noinspection PyPep8Naming
-class BluezGattDescriptor(ServiceInterface):
+class BluezGattDescriptor1(ServiceInterface):
 
     def __init__(self, uuid: str, characteristic_path: str, flags: list[str], value: bytes) -> None:
         super().__init__("org.bluez.GattDescriptor1")

@@ -1,7 +1,5 @@
 ﻿from dbus_next.service import ServiceInterface
 
-
-# noinspection PyPep8Naming
 class BluezGattApplication(ServiceInterface):
 
     def __init__(self, application_name: str) -> None:

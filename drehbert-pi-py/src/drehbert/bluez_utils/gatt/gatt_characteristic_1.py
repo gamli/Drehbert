@@ -7,7 +7,7 @@ from ..binary_utils import read_at_offset
 
 
 # noinspection PyPep8Naming
-class BluezGattCharacteristic(ServiceInterface):
+class BluezGattCharacteristic1(ServiceInterface):
 
     def __init__(self, uuid: str, service_path: str, flags: list[str], value: DBUS_BYTE_ARRAY) -> None:
         super().__init__("org.bluez.GattCharacteristic1")

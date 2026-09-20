@@ -9,19 +9,18 @@ from dbus_next.service import ServiceInterface
 from drehbert.bluez_utils.bluez_api_dbus_typings.bluez_agent_manager_1 import BlueZAgentManager1
 from drehbert.bluez_utils.bluez_api_dbus_typings.bluez_le_advertising_manager_1 import BlueZLEAdvertisingManager1
 from drehbert.bluez_utils.bluez_api_dbus_typings.bluez_properties import BlueZProperties
-from drehbert.bluez_utils.bluez_auto_accepting_pairing_agent import BlueZAutoAcceptingPairingAgent
+from drehbert.bluez_utils.bluez_auto_accepting_pairing_agent_1 import BlueZAutoAcceptingPairingAgent1
 from drehbert.bluez_utils.bluez_le_advertisement_1 import BluezLEAdvertisement1
 from drehbert.bluez_utils.gatt.gatt_application import BluezGattApplication
-from drehbert.bluez_utils.gatt.gatt_characteristics import BluezGattCharacteristic
-from drehbert.bluez_utils.gatt.gatt_descriptor import BluezGattDescriptor
+from drehbert.bluez_utils.gatt.gatt_characteristic_1 import BluezGattCharacteristic1
+from drehbert.bluez_utils.gatt.gatt_descriptor_1 import BluezGattDescriptor1
 from drehbert.bluez_utils.gatt.gatt_manager_1 import BlueZGattManager1
-from drehbert.bluez_utils.gatt.gatt_service import BluezGattService
+from drehbert.bluez_utils.gatt.gatt_service_1 import BluezGattService1
 from drehbert.drehbert_context_manager import DrehbertAsyncContextManager
 from drehbert.optional_value import OptionalValue
 
 
 class BluetoothCamera(DrehbertAsyncContextManager):
-
 
     _BLUEZ_SERVICE = "org.bluez"
     _BLUEZ_ADAPTER_PATH = "/org/bluez/hci0"
@@ -83,7 +82,7 @@ class BluetoothCamera(DrehbertAsyncContextManager):
         self._adapter = OptionalValue[BlueZProperties]()
         self._gatt_manager = OptionalValue[BlueZGattManager1]()
         self._advertising_manager = OptionalValue[BlueZLEAdvertisingManager1]()
-        self._report = OptionalValue[BluezGattCharacteristic]()
+        self._report = OptionalValue[BluezGattCharacteristic1]()
         self._exported_interfaces: list[tuple[str, ServiceInterface]] = []
         self._agent_registered = False
         self._gatt_registered = False
@@ -93,7 +92,7 @@ class BluetoothCamera(DrehbertAsyncContextManager):
 
         self._dbus(await MessageBus(bus_type=BusType.SYSTEM).connect())
 
-        self._export(self._PAIRING_AGENT_PATH, BlueZAutoAcceptingPairingAgent())
+        self._export_interface(self._PAIRING_AGENT_PATH, BlueZAutoAcceptingPairingAgent1())
 
         self._agent_manager(cast(
             BlueZAgentManager1,
@@ -128,7 +127,7 @@ class BluetoothCamera(DrehbertAsyncContextManager):
             self._HID_SVC_GUID,
             self._HID_GENERIC_APPEARANCE,
         )
-        self._export(self._ADVERTISEMENT_PATH, advertisement)
+        self._export_interface(self._ADVERTISEMENT_PATH, advertisement)
         await self._advertising_manager().call_register_advertisement(self._ADVERTISEMENT_PATH, {})
         self._advertisement_registered = True
 
@@ -193,61 +192,61 @@ class BluetoothCamera(DrehbertAsyncContextManager):
         proxy_object = self._dbus().get_proxy_object(self._BLUEZ_SERVICE, path, introspection)
         return proxy_object.get_interface(name)
 
-    def _export(self, path: str, interface: ServiceInterface) -> None:
+    def _export_interface(self, path: str, interface: ServiceInterface) -> None:
         assert self._dbus is not None
         self._dbus().export(path, interface)
         self._exported_interfaces.append((path, interface))
 
     def _export_gatt_application(self) -> None:
-        self._export(self._GATT_APPLICATION_PATH, BluezGattApplication(self._GATT_APPLICATION_NAME))
-        self._export(self._GATT_SERVICE_PATH, BluezGattService(self._HID_SVC_GUID))
+        self._export_interface(self._GATT_APPLICATION_PATH, BluezGattApplication(self._GATT_APPLICATION_NAME))
+        self._export_interface(self._GATT_SERVICE_PATH, BluezGattService1(self._HID_SVC_GUID))
 
-        self._export(self._GATT_INFORMATION_PATH, BluezGattCharacteristic(
+        self._export_interface(self._GATT_INFORMATION_PATH, BluezGattCharacteristic1(
             self._HID_SVC_INFORMATION_GUID,
             self._GATT_SERVICE_PATH,
             ["read", "encrypt-read"],
             bytes((0x11, 0x01, 0x00, 0x02)),
         ))
-        self._export(self._GATT_REPORT_MAP_PATH, BluezGattCharacteristic(
+        self._export_interface(self._GATT_REPORT_MAP_PATH, BluezGattCharacteristic1(
             self._HID_SVC_REPORT_MAP_GUID,
             self._GATT_SERVICE_PATH,
             ["read", "encrypt-read"],
             self._REPORT_MAP,
         ))
-        self._export(self._GATT_CONTROL_POINT_PATH, BluezGattCharacteristic(
+        self._export_interface(self._GATT_CONTROL_POINT_PATH, BluezGattCharacteristic1(
             self._HID_SVC_CONTROL_POINT_GUID,
             self._GATT_SERVICE_PATH,
             ["write-without-response", "encrypt-write"],
             b"\x00",
         ))
 
-        self._report(BluezGattCharacteristic(
+        self._report(BluezGattCharacteristic1(
             self._HID_SVC_REPORT_GUID,
             self._GATT_SERVICE_PATH,
             ["read", "notify", "encrypt-read"],
             b"\x00",
         ))
-        self._export(self._GATT_REPORT_PATH, self._report())
-        self._export(self._GATT_REPORT_REFERENCE_PATH, BluezGattDescriptor(
+        self._export_interface(self._GATT_REPORT_PATH, self._report())
+        self._export_interface(self._GATT_REPORT_REFERENCE_PATH, BluezGattDescriptor1(
             self._HID_SVC_REPORT_REFERENCE_GUID,
             self._GATT_REPORT_PATH,
             ["read", "encrypt-read"],
             bytes((1, 1)),
         ))
 
-        self._export(self._BATTERY_SERVICE_PATH, BluezGattService(self._BATTERY_SVC_GUID))
-        self._export(self._BATTERY_LEVEL_PATH, BluezGattCharacteristic(
+        self._export_interface(self._BATTERY_SERVICE_PATH, BluezGattService1(self._BATTERY_SVC_GUID))
+        self._export_interface(self._BATTERY_LEVEL_PATH, BluezGattCharacteristic1(
             self._BATTERY_LEVEL_GUID,
             self._BATTERY_SERVICE_PATH,
             ["read"],
             bytes((100,)),
         ))
 
-        self._export(
+        self._export_interface(
             self._DEVICE_INFORMATION_SERVICE_PATH,
-            BluezGattService(self._DEVICE_INFORMATION_SVC_GUID),
+            BluezGattService1(self._DEVICE_INFORMATION_SVC_GUID),
         )
-        self._export(self._PNP_ID_PATH, BluezGattCharacteristic(
+        self._export_interface(self._PNP_ID_PATH, BluezGattCharacteristic1(
             self._PNP_ID_GUID,
             self._DEVICE_INFORMATION_SERVICE_PATH,
             ["read"],

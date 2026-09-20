@@ -1,6 +1,6 @@
 ﻿from typing import Final
 
-from drehbert.bluetooth_camera import BluetoothCamera
+from bluez_utils.bluetooth_camera import BluetoothCamera
 from drehbert.drehbert_buttons import DrehbertButtons
 from drehbert.drehbert_leds import DrehbertLEDs
 from drehbert.stepper_motor import StepperMotor
