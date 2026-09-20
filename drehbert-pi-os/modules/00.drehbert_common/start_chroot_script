@@ -10,6 +10,12 @@ apt-get install --yes --no-install-recommends \
   python3 \
   python3-venv
 
+# Raspberry Pi OS blocks newly registered radios by default. Its Bluetooth
+# whitelist omits the PL011 path used by the Raspberry Pi Zero W, so seed the
+# persistent systemd-rfkill state for Drehbert's on-board adapter explicitly.
+install --directory --mode 0755 /var/lib/systemd/rfkill
+printf '0\n' > /var/lib/systemd/rfkill/platform-20201000.serial:bluetooth
+
 for unit in bluetooth.service hciuart.service; do
   if systemctl list-unit-files "${unit}" --no-legend 2>/dev/null |
      awk -v unit="${unit}" '$1 == unit { found=1 } END { exit !found }'; then
